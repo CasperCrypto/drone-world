@@ -4,6 +4,8 @@ An open-source drone flight sandbox: build, fly and test drones in 3D.
 Runs in the browser today (three.js); an Unreal Engine client for the
 photoreal version comes later and will use the same flight physics.
 
+**Play it in your browser: https://caspercrypto.github.io/drone-world/**
+
 **Status, 2026-10-29: first playable prototype (milestone M1).** The landscape
 is generated, not a real place yet. The flight physics is a simplified
 quadcopter model and every drone number in it is an estimate. This is a
