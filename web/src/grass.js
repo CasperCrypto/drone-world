@@ -118,7 +118,7 @@ vec3 objectNormal = normalize(vec3(dwFwd.x, 0.0, dwFwd.y) * 0.35 + vec3(0.0, 1.0
 // Colour: the ground scan under the tuft, darker at the root, lighter and drier at the tip.
 vec3 dwGround = mix(textureLod(uGAlbedo, vec3(dwXZ / 2.0, 0.0), 7.0).rgb,
                     textureLod(uGAlbedo, vec3(dwXZ / 2.0, 1.0), 7.0).rgb, dwMap.g);
-vec3 dwTipTint = mix(vec3(1.05, 1.2, 0.75), vec3(1.25, 1.15, 0.8), dwMap.g);
+vec3 dwTipTint = mix(vec3(0.88, 1.18, 0.6), vec3(1.2, 1.12, 0.72), dwMap.g);
 vGrassColor = dwGround * mix(vec3(0.45), dwTipTint, dwT) * (0.85 + 0.3 * fract(dwR * 11.3)) * (1.0 - 0.55 * dwMap.b); // darker under trees, like the ground
 // Wet blades: darker and a little more saturated.
 vGrassColor *= mix(vec3(1.0), vec3(0.62, 0.7, 0.6), uWetness);
