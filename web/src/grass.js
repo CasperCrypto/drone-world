@@ -117,7 +117,7 @@ vec3 objectNormal = normalize(vec3(dwFwd.x, 0.0, dwFwd.y) * 0.35 + vec3(0.0, 1.0
 vec3 dwGround = mix(textureLod(uGAlbedo, vec3(dwXZ / 2.0, 0.0), 7.0).rgb,
                     textureLod(uGAlbedo, vec3(dwXZ / 2.0, 1.0), 7.0).rgb, dwMap.g);
 vec3 dwTipTint = mix(vec3(1.05, 1.2, 0.75), vec3(1.35, 1.2, 0.85), dwMap.g);
-vGrassColor = dwGround * mix(vec3(0.45), dwTipTint, dwT) * (0.85 + 0.3 * fract(dwR * 11.3));
+vGrassColor = dwGround * mix(vec3(0.45), dwTipTint, dwT) * (0.85 + 0.3 * fract(dwR * 11.3)) * (1.0 - 0.55 * dwMap.b); // darker under trees, like the ground
 vGrassT = dwT;
 vGrassWPos = dwPos;
 vGrassOpen = 1.0 - dwMap.b; // under trees the sun rarely shines through

@@ -289,7 +289,7 @@ export class Terrain {
         const x = -HALF + i * CELL;
         const z = -HALF + j * CELL;
         const w = this.splats.subarray(k * 6, k * 6 + 6);
-        let density = w[0] + w[1] * 0.9 + w[2] * 0.25;
+        let density = w[0] + w[1] * 0.9 + w[2] * 0.12;
         if (onHardSurface(x, z, 1.5) || this.heights[k] < WATER_LEVEL + 0.3) density = 0;
         const dry = w[1] / Math.max(w[0] + w[1], 1e-3);
         grass[k * 4] = Math.round(Math.min(1, density) * 255);
