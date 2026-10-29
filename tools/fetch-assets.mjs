@@ -107,7 +107,7 @@ CC0 (public domain); credit is not required but given gladly. Fetched by
 |---|---|---|---|
 ${credits.join('\n')}
 
-Tree bark and leaf textures in \`../vendor/ez-tree/assets/\` come with
+Tree bark and leaf textures in \`trees/\` come with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck); its
 bark README credits Poly Haven and TextureCan.
 `);

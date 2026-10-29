@@ -1,89 +1,87 @@
 // main.js — Drone World in the browser.
 //
-// Does: sets up the three.js scene (sky, sun, terrain, world), runs the
-// flight model every frame with the current sticks, resolves collisions with
-// the ground, trees, buildings and the lake, moves the cameras, drives the
-// HUD, the gate course and the settings.
-// Does NOT: compute flight physics (flight.js does) or read devices
-// (controls.js does).
+// Does: loads the textures, builds the world (terrain, forest, grass, lake,
+// airfield, farm), the sky, weather and wind, runs the flight model every
+// frame with the current sticks and the wind at the drone, resolves
+// collisions, moves the cameras, drives the HUD, the gate course and the
+// settings, and renders through post-processing.
+// Does NOT: compute flight physics (flight.js does), read devices
+// (controls.js does) or decide the weather and light (environment.js does).
 
 import * as THREE from 'three';
-import { Sky } from 'three/addons/objects/Sky.js';
 import { Terrain, WORLD_SIZE } from './terrain.js';
+import { TextureLibrary } from './textures.js';
+import { Forest } from './forest.js';
+import { Grass } from './grass.js';
 import { World } from './world.js';
+import { LakeReflection } from './water.js';
+import { Environment } from './environment.js';
+import { PRESETS as WEATHER } from './weather.js';
 import { DroneMesh } from './drone-mesh.js';
 import { Controls } from './controls.js';
+import { Post } from './post.js';
+import { QUALITY, loadQualityKey, saveQualityKey } from './quality.js';
+import { PAD } from './layout.js';
 import {
   FlightModel, Mode, MODES, Vec3, cameraDronePreset, fpv5InchPreset,
   toThreePosition, toThreeQuaternion, fromThreePosition,
 } from './flight.js';
 
+// Diffuse light from the sky comes mostly from the hemisphere light; the
+// reflection map adds only a share of it, so custom shaders (impostors,
+// clouds) that use the hemisphere colours match the standard materials.
+THREE.ShaderChunk.lights_fragment_maps = THREE.ShaderChunk.lights_fragment_maps.replace(
+  'iblIrradiance += getIBLIrradiance( geometryNormal );',
+  'iblIrradiance += 0.3 * getIBLIrradiance( geometryNormal );',
+);
+
 const PRESETS = {
-  camera: { make: cameraDronePreset, size: 0.35, mode: Mode.HOLD, fpvTiltDeg: 0 },
-  fpv: { make: fpv5InchPreset, size: 0.25, mode: Mode.ANGLE, fpvTiltDeg: 25 },
+  camera: { make: cameraDronePreset, size: 0.35, style: 'camera', mode: Mode.HOLD, fpvTiltDeg: 0 },
+  fpv: { make: fpv5InchPreset, size: 0.25, style: 'fpv', mode: Mode.ANGLE, fpvTiltDeg: 25 },
 };
-const START = new THREE.Vector3(-60, 0, 0); // the take-off pad
-const PILOT = new THREE.Vector3(-66, 0, 6); // where the ground-view pilot stands
+const START = new THREE.Vector3(PAD.x, 0, PAD.z); // the take-off pad
+const PILOT = new THREE.Vector3(PAD.x - 6, 0, PAD.z + 6); // where the ground-view pilot stands
 const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const $ = (id) => document.getElementById(id);
+
+const qualityKey = loadQualityKey();
+const quality = QUALITY[qualityKey];
 
 // --- renderer, scene, camera -------------------------------------------------
-const canvas = document.getElementById('scene');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+const canvas = $('scene');
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
+} catch (err) {
+  $('loading-text').textContent = 'This browser cannot start WebGL 2, which Drone World needs. Try a current Chrome, Edge, Firefox or Safari.';
+  throw err;
+}
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 0.85;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.info.autoReset = false; // counted per frame in frame(), including shadows
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, 1, 0.05, 6000);
+const camera = new THREE.PerspectiveCamera(70, 1, 0.08, 12000);
+camera.layers.enable(1); // layer 1: grass and rain, left out of the lake reflection
 
-// --- sky and light -----------------------------------------------------------
-const sunDir = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 36), THREE.MathUtils.degToRad(145));
-function makeSky() {
-  const sky = new Sky();
-  sky.scale.setScalar(20000);
-  const u = sky.material.uniforms;
-  u.turbidity.value = 5.5;
-  u.rayleigh.value = 1.4;
-  u.mieCoefficient.value = 0.004;
-  u.mieDirectionalG.value = 0.82;
-  u.sunPosition.value.copy(sunDir);
-  return sky;
+function progress(fraction, text) {
+  $('loading-bar').style.width = `${Math.round(fraction * 100)}%`;
+  if (text) $('loading-text').textContent = text;
 }
-scene.add(makeSky());
-{
-  const envScene = new THREE.Scene();
-  envScene.add(makeSky());
-  const pmrem = new THREE.PMREMGenerator(renderer);
-  scene.environment = pmrem.fromScene(envScene).texture;
-}
-scene.fog = new THREE.Fog(0xc4d2dc, 300, 2200);
-scene.add(new THREE.HemisphereLight(0xd6e6ff, 0x4a5a32, 0.55));
-const sun = new THREE.DirectionalLight(0xfff0d8, 2.4);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 600 });
-sun.shadow.bias = -0.0004;
-scene.add(sun, sun.target);
+const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 
-// --- world -------------------------------------------------------------------
-const terrain = new Terrain(7);
-scene.add(terrain.buildMesh());
-const world = new World(scene, terrain);
+// --- state filled in by start() -------------------------------------------------
+let terrain;
+let forest;
+let world;
+let grass;
+let envr;
+let post;
+let reflection = null;
 const drone = new DroneMesh();
-scene.add(drone.root);
-
-// Drone shadow blob so height is readable even with shadows off.
-const blob = new THREE.Mesh(
-  new THREE.CircleGeometry(0.3, 24),
-  new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }),
-);
-blob.rotation.x = -Math.PI / 2;
-scene.add(blob);
-
-// --- flight state ------------------------------------------------------------
-const controls = new Controls(document.getElementById('touch'));
+const controls = new Controls($('touch'));
 const model = new FlightModel();
 let presetKey = 'camera';
 let camMode = 'chase';
@@ -93,16 +91,15 @@ const dronePos = new THREE.Vector3();
 const prevPos = new THREE.Vector3();
 const droneQuat = new THREE.Quaternion();
 const camPos = new THREE.Vector3();
-let windSpeed = 0;
-let windFrom = 270;
 let simTime = 0;
+let windAtDrone = { x: 0, y: 0, z: 0, speed: 0, mean: 0, gust: 0 };
 
 function radius() {
   return PRESETS[presetKey].size * 0.45;
 }
 
 function resetFlight() {
-  origin.set(START.x, terrain.heightAt(START.x, START.z) + radius(), START.z);
+  origin.set(START.x, terrain.heightAt(START.x, START.z) + 0.11 + radius(), START.z);
   model.reset(new Vec3(0, 0, 0), 0); // heading 0 = east, along the runway
   controls.resetKeyThrottle(-1);
   syncDrone();
@@ -117,8 +114,8 @@ function applyPreset(key) {
   const p = PRESETS[key];
   model.setParams(p.make());
   model.setMode(p.mode);
-  drone.build(p.size);
-  document.getElementById('model-info').textContent = 'Changes only the look. The flight physics stays the chosen preset.';
+  drone.build(p.size, p.style);
+  $('model-info').textContent = 'Changes only the look. The flight physics stays the chosen preset.';
   updateButtons();
   resetFlight();
 }
@@ -136,12 +133,6 @@ function modeHint() {
   if (model.mode === Mode.HOLD) return 'Hold W to climb; release the sticks and it hovers.';
   if (model.mode === Mode.ANGLE) return 'You hold the throttle: W/S set it, it stays where you leave it.';
   return 'Acro: sticks set rotation speed. Practise high up.';
-}
-
-function setWind() {
-  const toward = THREE.MathUtils.degToRad(windFrom + 180);
-  const v3 = new THREE.Vector3(Math.sin(toward), 0, -Math.cos(toward)).multiplyScalar(windSpeed);
-  model.setWind(fromThreePosition(v3.x, v3.y, v3.z));
 }
 
 function syncDrone() {
@@ -195,7 +186,7 @@ function updateCamera(dt) {
     const tilt = THREE.MathUtils.degToRad(PRESETS[presetKey].fpvTiltDeg);
     const fwd = new THREE.Vector3(Math.cos(tilt), Math.sin(tilt), 0).applyQuaternion(droneQuat);
     const up = new THREE.Vector3(-Math.sin(tilt), Math.cos(tilt), 0).applyQuaternion(droneQuat);
-    camera.position.copy(dronePos).add(new THREE.Vector3(PRESETS[presetKey].size * 0.32, 0.01, 0).applyQuaternion(droneQuat));
+    camera.position.copy(dronePos).add(new THREE.Vector3(PRESETS[presetKey].size * 0.34, 0.02, 0).applyQuaternion(droneQuat));
     camera.up.copy(up);
     camera.lookAt(tmp.copy(camera.position).add(fwd));
     camera.fov = 100;
@@ -212,16 +203,18 @@ function updateCamera(dt) {
     const want = dronePos.clone().addScaledVector(fwd, -dist).add(new THREE.Vector3(0, 0.7, 0));
     camPos.lerp(want, 1 - Math.exp(-dt * 6));
     camPos.y = Math.max(camPos.y, terrain.heightAt(camPos.x, camPos.z) + 0.6);
+    // Keep trunks, crowns and walls out from between the camera and the drone.
+    for (let k = 0; k < 6 && world.collide(camPos, 0.25); k++) camPos.lerp(dronePos, 0.35);
     camera.position.copy(camPos);
     camera.up.set(0, 1, 0);
     camera.lookAt(tmp.copy(dronePos).addScaledVector(fwd, 2));
     camera.fov = 70;
   }
   camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
 }
 
 // --- HUD -----------------------------------------------------------------------
-const $ = (id) => document.getElementById(id);
 let msgTimer = null;
 function show(text, ms = 3500) {
   const el = $('msg');
@@ -231,11 +224,17 @@ function show(text, ms = 3500) {
   msgTimer = setTimeout(() => { el.hidden = true; }, ms);
 }
 const fmtTime = (s) => (s === null || s === undefined ? '—' : `${s.toFixed(2)} s`);
+const compass = (deg) => COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
 let hudClock = 0;
+let frames = 0;
+let fps = 0;
 function updateHud(dt) {
   hudClock += dt;
-  if (hudClock < 0.1) return;
+  frames++;
+  if (hudClock < 0.25) return;
+  fps = frames / hudClock;
   hudClock = 0;
+  frames = 0;
   const s = model.state;
   $('hud-drone').textContent = model.p.name;
   $('hud-mode').textContent = model.mode;
@@ -243,8 +242,14 @@ function updateHud(dt) {
   $('hud-agl').textContent = `${(dronePos.y - terrain.heightAt(dronePos.x, dronePos.z) - radius()).toFixed(1)} m`;
   $('hud-home').textContent = `${Math.hypot(dronePos.x - START.x, dronePos.z - START.z).toFixed(0)} m`;
   $('hud-thr').style.width = `${(s.thrustFraction * 100).toFixed(0)}%`;
-  $('hud-wind').textContent = windSpeed > 0 ? `${windSpeed.toFixed(1)} m/s from ${COMPASS[Math.round(windFrom / 45) % 8]}` : 'calm';
+  const ws = Math.hypot(windAtDrone.x, windAtDrone.z);
+  // Bearing the air moves toward (clockwise from north = -z), turned around.
+  const from = (Math.atan2(windAtDrone.x, -windAtDrone.z) * 180) / Math.PI + 180;
+  $('hud-wind').textContent = ws < 0.3 ? 'calm' : `${ws.toFixed(1)} m/s from ${compass(from)}`;
   $('hud-input').textContent = controls.source;
+  $('hud-time').textContent = `${envr.clock}${envr.timeScale ? ' ▸' : ''}`;
+  $('hud-weather').textContent = `${envr.weatherLabel}, ${envr.weather.temperature.toFixed(0)} °C`;
+  $('hud-fps').textContent = `${fps.toFixed(0)} fps · ${quality.label}`;
   $('hud-gate').textContent = `${world.nextGate + 1} / ${world.gates.length}`;
   $('hud-lap').textContent = world.lapStart === null ? '—' : fmtTime(simTime - world.lapStart);
   $('hud-last').textContent = fmtTime(world.lastLap);
@@ -312,6 +317,57 @@ function updateRadioPanel() {
   });
 }
 
+function fmtHours(h) {
+  const hh = Math.floor(h);
+  const mm = Math.round((h - hh) * 60);
+  return `${String(hh).padStart(2, '0')}:${String(mm % 60).padStart(2, '0')}`;
+}
+
+function wireWorldSettings() {
+  const d = envr.date;
+  $('opt-date').value = `${d.y}-${String(d.m + 1).padStart(2, '0')}-${String(d.d).padStart(2, '0')}`;
+  $('opt-time').value = String(envr.hours);
+  $('opt-time-out').textContent = fmtHours(envr.hours);
+  $('opt-time').addEventListener('input', (e) => {
+    envr.setTime(Number(e.target.value));
+    $('opt-time-out').textContent = fmtHours(envr.hours);
+  });
+  $('opt-date').addEventListener('change', (e) => {
+    const [y, m, dd] = e.target.value.split('-').map(Number);
+    if (y && m && dd) envr.setDate(y, m - 1, dd);
+  });
+  $('opt-timescale').addEventListener('change', (e) => envr.setTimeScale(Number(e.target.value)));
+  const wsel = $('opt-weather');
+  for (const [key, p] of Object.entries(WEATHER)) wsel.add(new Option(p.label, key));
+  wsel.value = envr.weather.preset;
+  wsel.addEventListener('change', () => {
+    envr.setWeather(wsel.value);
+    $('opt-temp').value = String(envr.weather.temperature);
+    $('opt-temp-out').textContent = `${envr.weather.temperature} °C`;
+  });
+  $('opt-temp').value = String(envr.weather.temperature);
+  $('opt-temp-out').textContent = `${envr.weather.temperature} °C`;
+  $('opt-temp').addEventListener('input', (e) => {
+    envr.setTemperature(Number(e.target.value));
+    $('opt-temp-out').textContent = `${e.target.value} °C`;
+  });
+  const setWind = () => envr.setWind(Number($('wind-speed').value), Number($('wind-dir').value), $('wind-gust').value);
+  $('wind-speed').value = String(envr.windSpeed);
+  $('wind-speed-out').textContent = `${envr.windSpeed} m/s`;
+  $('wind-speed').addEventListener('input', (e) => { $('wind-speed-out').textContent = `${e.target.value} m/s`; setWind(); });
+  $('wind-dir').addEventListener('input', (e) => { $('wind-dir-out').textContent = compass(Number(e.target.value)); setWind(); });
+  $('wind-gust').addEventListener('change', setWind);
+  const qsel = $('opt-quality');
+  for (const [key, q] of Object.entries(QUALITY)) qsel.add(new Option(q.label, key));
+  qsel.value = qualityKey;
+  qsel.addEventListener('change', () => {
+    saveQualityKey(qsel.value);
+    $('quality-note').textContent = 'Saved. Reload the page to apply.';
+    $('btn-reload').hidden = false;
+  });
+  $('btn-reload').addEventListener('click', () => location.reload());
+}
+
 function wireUi() {
   $('btn-start').addEventListener('click', closeSheets);
   $('btn-close').addEventListener('click', closeSheets);
@@ -320,20 +376,8 @@ function wireUi() {
   $('preset-camera').addEventListener('click', () => applyPreset('camera'));
   $('preset-fpv').addEventListener('click', () => applyPreset('fpv'));
   document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
-  $('wind-speed').addEventListener('input', (e) => {
-    windSpeed = Number(e.target.value);
-    $('wind-speed-out').textContent = `${windSpeed} m/s`;
-    setWind();
-  });
-  $('wind-dir').addEventListener('input', (e) => {
-    windFrom = Number(e.target.value);
-    $('wind-dir-out').textContent = COMPASS[Math.round(windFrom / 45) % 8];
-    setWind();
-  });
-  $('opt-shadows').addEventListener('change', (e) => {
-    sun.castShadow = e.target.checked;
-  });
-  $('opt-hires').addEventListener('change', () => resize());
+  $('opt-shadows').addEventListener('change', (e) => { envr.sky.shadowsOn = e.target.checked; });
+  $('opt-light').addEventListener('change', (e) => drone.setHeadlight(e.target.checked));
   $('model-file').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -347,6 +391,7 @@ function wireUi() {
   $('model-rotate').addEventListener('click', () => drone.rotateQuarter());
   $('model-reset').addEventListener('click', () => applyPreset(presetKey));
   buildRadioTable();
+  wireWorldSettings();
 
   controls.on('mode', () => setMode(MODES[(MODES.indexOf(model.mode) + 1) % MODES.length]));
   controls.on('camera', () => {
@@ -358,12 +403,19 @@ function wireUi() {
   controls.on('course', () => { world.resetCourse(); show('Gate course restarted. Fly through the green gate.'); });
   controls.on('settings', () => ($('settings').hidden ? openSheet('settings') : closeSheets()));
   controls.on('help', () => ($('help').hidden ? openSheet('help') : closeSheets()));
+  controls.on('light', () => {
+    drone.setHeadlight(!drone.headlightOn);
+    $('opt-light').checked = drone.headlightOn;
+    show(drone.headlightOn ? 'Headlight on' : 'Headlight off', 1200);
+  });
 }
 
 function resize() {
-  const hi = $('opt-hires').checked;
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, hi ? 1.5 : 0.75));
+  const ratio = Math.min(window.devicePixelRatio || 1, quality.pixelRatio);
+  renderer.setPixelRatio(ratio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
+  post?.setSize(window.innerWidth, window.innerHeight, ratio);
+  reflection?.setSize(window.innerWidth * ratio, window.innerHeight * ratio);
   camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
   camera.updateProjectionMatrix();
 }
@@ -374,6 +426,8 @@ const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
+  windAtDrone = envr.windAt(dronePos);
+  model.setWind(fromThreePosition(windAtDrone.x, windAtDrone.y, windAtDrone.z));
   if (!paused) {
     const sticks = controls.poll(dt, model.mode === Mode.HOLD, model.hoverStick());
     prevPos.copy(dronePos);
@@ -388,32 +442,89 @@ function frame() {
   } else {
     controls.poll(0, true, 0); // keep gamepad buttons and radio learning live in menus
   }
-  drone.update(dt, model.state.thrustFraction);
-  const ground = terrain.heightAt(dronePos.x, dronePos.z);
-  blob.position.set(dronePos.x, ground + 0.05, dronePos.z);
-  blob.material.opacity = THREE.MathUtils.clamp(0.4 - (dronePos.y - ground) * 0.02, 0, 0.4);
-  sun.position.copy(dronePos).addScaledVector(sunDir, 250);
-  sun.target.position.copy(dronePos);
   updateCamera(dt);
+  const light = envr.update(dt, camera, dronePos);
+  drone.update(dt, model.state.thrustFraction, light.night);
+  forest.update(camera);
+  grass.update(camera, terrain.heightAt(camera.position.x, camera.position.z));
   updateHud(dt);
   updateRadioPanel();
-  renderer.render(scene, camera);
+  renderer.info.reset();
+  reflection?.render(renderer, scene, camera);
+  post.render(dt);
 }
 
-wireUi();
-resize();
-applyPreset('camera');
-setWind();
-frame();
+async function start() {
+  progress(0.02, 'Loading scanned ground, rock and building textures…');
+  const textures = await new TextureLibrary(renderer).load(quality.groundTex, (f) => progress(0.02 + f * 0.3));
+  await nextFrame();
+  progress(0.34, 'Shaping the landscape…');
+  await nextFrame();
+  terrain = new Terrain(7);
+  scene.add(terrain.buildMesh(textures));
+  scene.add(terrain.buildFarMesh(textures));
+  progress(0.48, 'Growing the forest…');
+  await nextFrame();
+  forest = new Forest(scene, terrain, textures, quality);
+  await forest.build(renderer, (f) => progress(0.48 + f * 0.32, f < 0.6 ? 'Growing the forest…' : 'Planting and baking distant trees…'));
+  progress(0.82, 'Building the airfield and the farm…');
+  await nextFrame();
+  world = new World(scene, terrain, textures, forest);
+  grass = new Grass(terrain, textures, { count: quality.grass, patch: quality.grassPatch });
+  grass.mesh.layers.set(1);
+  scene.add(grass.mesh);
+  envr = new Environment({ renderer, scene, terrain, forest, world, quality });
+  envr.weather.particles.layers.set(1);
+  if (quality.reflections) reflection = new LakeReflection(world.lake, 0.5);
+  scene.add(drone.root);
+  post = new Post(renderer, scene, camera, quality);
+  wireUi();
+  resize();
+  applyPreset('camera');
+  updateCamera(0.016);
+  envr.update(0.016, camera, dronePos);
+  forest.update(camera, true);
+  await textures.settle();
+  progress(0.95, 'Preparing shaders…');
+  await nextFrame();
+  renderer.compile(scene, camera);
+  progress(1, 'Ready');
+  $('loading').hidden = true;
+  $('help').hidden = false;
+  clock.getDelta();
+  frame();
 
-// For tests and for people poking at the sandbox from the console.
-window.droneWorld = {
-  ready: true,
-  model,
-  terrain,
-  world,
-  get position() { return dronePos.clone(); },
-  start: closeSheets,
-  setMode,
-  applyPreset,
-};
+  // For tests and for people poking at the sandbox from the console.
+  window.droneWorld = {
+    ready: true,
+    model,
+    terrain,
+    world,
+    forest,
+    env: envr,
+    renderer,
+    get position() { return dronePos.clone(); },
+    start: closeSheets,
+    setMode,
+    applyPreset,
+    setCamera(mode) { camMode = mode; },
+    // Put the drone at (x, height above ground, z) facing heading (radians, 0 = east).
+    teleport(x, h, z, heading = 0) {
+      origin.set(x, terrain.heightAt(x, z) + h, z);
+      model.reset(new Vec3(0, 0, 0), heading);
+      model.state.onGround = false;
+      syncDrone();
+      camPos.copy(dronePos).add(new THREE.Vector3(-Math.cos(heading) * 2.2, 0.7, Math.sin(heading) * 2.2));
+    },
+    pause(on = true) { paused = on; },
+    get stats() {
+      const r = renderer.info.render;
+      return { triangles: r.triangles, calls: r.calls, fps, trees: forest.counts };
+    },
+  };
+}
+
+start().catch((err) => {
+  console.error(err);
+  $('loading-text').textContent = `Could not start: ${err.message || err}`;
+});
