@@ -14,6 +14,7 @@ import { TextureLibrary } from './textures.js';
 import { Forest } from './forest.js';
 import { Grass } from './grass.js';
 import { World } from './world.js';
+import { LakeReflection } from './water.js';
 import { Environment } from './environment.js';
 import { PRESETS as WEATHER } from './weather.js';
 import { DroneMesh } from './drone-mesh.js';
@@ -63,6 +64,7 @@ renderer.info.autoReset = false; // counted per frame in frame(), including shad
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, 1, 0.08, 12000);
+camera.layers.enable(1); // layer 1: grass and rain, left out of the lake reflection
 
 function progress(fraction, text) {
   $('loading-bar').style.width = `${Math.round(fraction * 100)}%`;
@@ -77,6 +79,7 @@ let world;
 let grass;
 let envr;
 let post;
+let reflection = null;
 const drone = new DroneMesh();
 const controls = new Controls($('touch'));
 const model = new FlightModel();
@@ -240,7 +243,8 @@ function updateHud(dt) {
   $('hud-home').textContent = `${Math.hypot(dronePos.x - START.x, dronePos.z - START.z).toFixed(0)} m`;
   $('hud-thr').style.width = `${(s.thrustFraction * 100).toFixed(0)}%`;
   const ws = Math.hypot(windAtDrone.x, windAtDrone.z);
-  const from = (Math.atan2(-windAtDrone.x, windAtDrone.z) * 180) / Math.PI + 180;
+  // Bearing the air moves toward (clockwise from north = -z), turned around.
+  const from = (Math.atan2(windAtDrone.x, -windAtDrone.z) * 180) / Math.PI + 180;
   $('hud-wind').textContent = ws < 0.3 ? 'calm' : `${ws.toFixed(1)} m/s from ${compass(from)}`;
   $('hud-input').textContent = controls.source;
   $('hud-time').textContent = `${envr.clock}${envr.timeScale ? ' ▸' : ''}`;
@@ -411,6 +415,7 @@ function resize() {
   renderer.setPixelRatio(ratio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   post?.setSize(window.innerWidth, window.innerHeight, ratio);
+  reflection?.setSize(window.innerWidth * ratio, window.innerHeight * ratio);
   camera.aspect = window.innerWidth / Math.max(1, window.innerHeight);
   camera.updateProjectionMatrix();
 }
@@ -445,6 +450,7 @@ function frame() {
   updateHud(dt);
   updateRadioPanel();
   renderer.info.reset();
+  reflection?.render(renderer, scene, camera);
   post.render(dt);
 }
 
@@ -465,8 +471,11 @@ async function start() {
   await nextFrame();
   world = new World(scene, terrain, textures, forest);
   grass = new Grass(terrain, textures, { count: quality.grass, patch: quality.grassPatch });
+  grass.mesh.layers.set(1);
   scene.add(grass.mesh);
   envr = new Environment({ renderer, scene, terrain, forest, world, quality });
+  envr.weather.particles.layers.set(1);
+  if (quality.reflections) reflection = new LakeReflection(world.lake, 0.5);
   scene.add(drone.root);
   post = new Post(renderer, scene, camera, quality);
   wireUi();

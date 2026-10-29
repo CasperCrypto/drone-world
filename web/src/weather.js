@@ -93,7 +93,7 @@ void main() {
   float speed = mix(6.5 + aSeed.w * 2.0, 0.8 + aSeed.w * 0.5, uSnow);
   float fall = uTime * speed;
   // Position in a box that repeats around the camera; drift with the wind.
-  vec3 p = aSeed.xyz - vec3(uWind.x, -fall, uWind.z) * 0.0;
+  vec3 p = aSeed.xyz;
   p.x += uWind.x * uTime * mix(0.9, 1.0, uSnow) + sin(uTime * 1.3 + aSeed.w * 40.0) * uSnow * 0.6;
   p.z += uWind.z * uTime * mix(0.9, 1.0, uSnow) + cos(uTime * 1.1 + aSeed.w * 30.0) * uSnow * 0.6;
   p.y -= fall;

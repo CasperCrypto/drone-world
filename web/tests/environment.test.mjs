@@ -1,8 +1,9 @@
-// Tests for the sun, moon and wind models (no browser needed).
+// Tests for the sun, moon and wind models and the layout (no browser needed).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { sunPosition, moonPosition, polandUtcOffset, polandClockToUtc, POLAND } from '../src/solar.js';
 import { WindField, REF_HEIGHT, ALPHA_OPEN, drydenRatios } from '../src/wind.js';
+import { trackDistance, onHardSurface, RUNWAY, HOUSES, TRACKS } from '../src/layout.js';
 
 // Highest sun of a UTC day, sampled every minute.
 function maxElevation(y, m, d, lat, lon) {
@@ -145,4 +146,14 @@ test('the same seed gives the same wind', () => {
   b.configure({ speed10: 7, fromDeg: 120, gustiness: 1.6 });
   a.time = b.time = 12.5;
   assert.deepEqual(a.sample(10, 20, 30), b.sample(10, 20, 30));
+});
+
+
+test('layout: tracks and hard surfaces are where the world builds them', () => {
+  const [ax, az] = TRACKS[0][0];
+  assert.ok(trackDistance(ax, az) < 1e-9);
+  assert.ok(trackDistance(400, 400) > 100);
+  assert.ok(onHardSurface(RUNWAY.x, RUNWAY.z));
+  assert.ok(onHardSurface(HOUSES[0].x, HOUSES[0].z));
+  assert.ok(!onHardSurface(-300, -300));
 });

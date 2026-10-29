@@ -65,6 +65,9 @@ export function makeLake(terrain) {
     uHalf: { value: HALF },
     uGridN: { value: GRID },
     uLevel: { value: WATER_LEVEL },
+    uReflection: { value: null },
+    uReflMatrix: { value: new THREE.Matrix4() },
+    uReflOn: { value: 0 },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -82,6 +85,9 @@ uniform float uTime;
 uniform vec2 uWindDir;
 uniform float uWind10;
 uniform float uRain;
+uniform sampler2D uReflection;
+uniform mat4 uReflMatrix;
+uniform float uReflOn;
 varying vec3 vWaterPos;
 float dwDepth;
 ${NOISE_GLSL}
@@ -122,6 +128,14 @@ vec2 dwRipples(vec2 p, float t) {
   vec3 nw = normalize(vec3(-slope.x, 1.0, -slope.y));
   normal = normalize((viewMatrix * vec4(nw, 0.0)).xyz);
 }`)
+      .replace('#include <lights_fragment_maps>', `#include <lights_fragment_maps>
+#if defined( RE_IndirectSpecular )
+if (uReflOn > 0.5) {
+  vec4 rp = uReflMatrix * vec4(vWaterPos, 1.0);
+  vec2 ruv = rp.xy / rp.w + (normal.xy) * 0.035;
+  radiance = texture2D(uReflection, clamp(ruv, vec2(0.001), vec2(0.999))).rgb;
+}
+#endif`)
       .replace('#include <color_fragment>', `#include <color_fragment>
 dwDepth = max(uLevel - dwBed(vWaterPos.xz), 0.0);
 // Shallow water shows the bottom; deeper water turns dark green-blue.
@@ -134,5 +148,83 @@ diffuseColor.a = smoothstep(0.0, 0.35, dwDepth) * mix(0.55, 0.96, smoothstep(0.3
   mesh.receiveShadow = true;
   mesh.renderOrder = 1;
   mesh.name = 'lake';
+  mesh.userData.uniforms = uniforms;
   return mesh;
+}
+
+// Planar reflection of the scene in the lake (High and Ultra presets): the
+// scene is rendered from the camera mirrored in the water surface, at half
+// resolution, without grass and rain (layer 1), with an oblique near plane
+// so nothing under the water shows. Same method as three.js's Reflector.
+export class LakeReflection {
+  constructor(lake, scale = 0.5) {
+    this.lake = lake;
+    this.scale = scale;
+    this.target = new THREE.WebGLRenderTarget(16, 16, { type: THREE.HalfFloatType });
+    this.camera = new THREE.PerspectiveCamera();
+    this.camera.layers.set(0);
+    this.u = lake.userData.uniforms;
+    this.u.uReflection.value = this.target.texture;
+    this.u.uReflOn.value = 1;
+    this.sphere = new THREE.Sphere(new THREE.Vector3(LAKE.x, WATER_LEVEL, LAKE.z), LAKE.r * 1.2);
+    this.frustum = new THREE.Frustum();
+    this.tmp = new THREE.Matrix4();
+  }
+
+  setSize(width, height) {
+    this.target.setSize(Math.max(16, Math.round(width * this.scale)), Math.max(16, Math.round(height * this.scale)));
+  }
+
+  render(renderer, scene, camera) {
+    const cam = camera.position;
+    this.frustum.setFromProjectionMatrix(this.tmp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    const visible = cam.y > WATER_LEVEL + 0.05 && this.frustum.intersectsSphere(this.sphere) &&
+      cam.distanceTo(this.sphere.center) < 900;
+    this.u.uReflOn.value = visible ? 1 : 0;
+    if (!visible) return;
+    const n = new THREE.Vector3(0, 1, 0);
+    const p0 = this.sphere.center;
+    const v = this.camera;
+    // Mirror the camera position and its view direction in the plane y = WATER_LEVEL.
+    v.position.set(cam.x, 2 * WATER_LEVEL - cam.y, cam.z);
+    const rot = new THREE.Matrix4().extractRotation(camera.matrixWorld);
+    const look = new THREE.Vector3(0, 0, -1).applyMatrix4(rot).add(cam);
+    look.y = 2 * WATER_LEVEL - look.y;
+    v.up.set(0, 1, 0).applyMatrix4(rot).reflect(n);
+    v.lookAt(look);
+    v.near = camera.near;
+    v.far = camera.far;
+    v.updateMatrixWorld();
+    v.projectionMatrix.copy(camera.projectionMatrix);
+    // Texture matrix: world -> reflection texture coordinates.
+    this.u.uReflMatrix.value.set(0.5, 0, 0, 0.5, 0, 0.5, 0, 0.5, 0, 0, 0.5, 0.5, 0, 0, 0, 1)
+      .multiply(v.projectionMatrix).multiply(v.matrixWorldInverse);
+    // Oblique near plane at the water surface (Lengyel).
+    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(n, p0).applyMatrix4(v.matrixWorldInverse);
+    const clip = new THREE.Vector4(plane.normal.x, plane.normal.y, plane.normal.z, plane.constant);
+    const pm = v.projectionMatrix.elements;
+    const q = new THREE.Vector4(
+      (Math.sign(clip.x) + pm[8]) / pm[0],
+      (Math.sign(clip.y) + pm[9]) / pm[5],
+      -1,
+      (1 + pm[10]) / pm[14],
+    );
+    clip.multiplyScalar(2 / clip.dot(q));
+    pm[2] = clip.x;
+    pm[6] = clip.y;
+    pm[10] = clip.z + 1 - 0.003;
+    pm[14] = clip.w;
+    v.projectionMatrixInverse.copy(v.projectionMatrix).invert();
+
+    const prevTarget = renderer.getRenderTarget();
+    const prevShadow = renderer.shadowMap.autoUpdate;
+    renderer.shadowMap.autoUpdate = false;
+    this.lake.visible = false;
+    renderer.setRenderTarget(this.target);
+    renderer.clear();
+    renderer.render(scene, v);
+    this.lake.visible = true;
+    renderer.setRenderTarget(prevTarget);
+    renderer.shadowMap.autoUpdate = prevShadow;
+  }
 }

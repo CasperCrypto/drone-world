@@ -380,7 +380,8 @@ void main() {
     }
     this.key.position.copy(focus).addScaledVector(this.keyDir, 400);
     this.key.target.position.copy(focus);
-    this.key.castShadow = this.shadowsOn !== false && this.key.intensity > 0.02;
+    // Kept on day and night: switching it would recompile every shader at dusk.
+    this.key.castShadow = this.shadowsOn !== false;
 
     this.maybeUpdateEnvironment(sun, weather);
     return { sun, moon, night, day, exposure: this.exposure };
