@@ -424,6 +424,8 @@ float tAO;
   col /= tot;
   nrm /= tot;
   arm /= tot;
+  // Fresh snow: brighter and more even than the scan's footprints.
+  col = mix(col, vec3(0.8, 0.83, 0.88) * (0.92 + 0.12 * dwNoise(xz * 0.4)), snowW * 0.55);
   // Large-scale variation from an aerial meadow scan, so fields are not one flat colour.
   float m1 = dot(texture(uGAlbedo, vec3(xz / 171.0, 7.0)).rgb, vec3(0.3, 0.59, 0.11));
   float m2 = dot(texture(uGAlbedo, vec3(xz / 47.0 + 0.5, 7.0)).rgb, vec3(0.3, 0.59, 0.11));

@@ -72,11 +72,15 @@ gl_Position = projectionMatrix * mvPosition;`;
 function addSway(material, treeH, cacheKey, extraFragment) {
   material.customProgramCacheKey = () => cacheKey;
   material.onBeforeCompile = (shader) => {
-    linkEnv(shader, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor']);
+    linkEnv(shader, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uSnow']);
     shader.uniforms.uTreeH = { value: treeH };
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${SWAY_GLSL}`)
-      .replace('#include <project_vertex>', PROJECT_WITH_SWAY);
+      .replace('#include <common>', `#include <common>\n${SWAY_GLSL}\nvarying float vSnowUp;`)
+      .replace('#include <project_vertex>', `${PROJECT_WITH_SWAY}\nvSnowUp = normalize(mat3(modelMatrix) * normal).y;`);
+    // Snow settles on the upper side of branches and leaves.
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uSnow;\nvarying float vSnowUp;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82, 0.85, 0.9), uSnow * 0.75 * smoothstep(0.15, 0.7, vSnowUp));');
     if (extraFragment) extraFragment(shader);
   };
 }
@@ -330,7 +334,7 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
         uCols: { value: this.atlas.cols },
         uRows: { value: this.atlas.rows },
         uBakeElev: { value: BAKE_ELEVATION },
-        ...pick(env, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uAmbient', 'uGroundAmbient', 'uFogColor', 'uFogDensity']),
+        ...pick(env, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uAmbient', 'uGroundAmbient', 'uFogColor', 'uFogDensity', 'uSnow']),
       },
       vertexShader: /* glsl */ `
 attribute vec3 iPos;
@@ -369,6 +373,7 @@ uniform vec3 uGroundAmbient;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
 uniform float uBakeElev;
+uniform float uSnow;
 varying vec2 vUv;
 varying vec3 vRight;
 varying vec3 vToCam;
@@ -383,6 +388,7 @@ void main() {
   vec3 N = normalize(vRight * n.x + vec3(0.0, 1.0, 0.0) * (ce * n.y + se * n.z) + vToCam * (ce * n.z - se * n.y));
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 amb = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
+  albedo = mix(albedo, vec3(0.82, 0.85, 0.9), uSnow * 0.75 * smoothstep(0.15, 0.7, N.y));
   // Same units as three.js lights: irradiance times albedo / pi; trees shade themselves a little.
   vec3 albedo = c.rgb / max(c.a, 0.35);
   // Like the leaf material: direct light, sky light, a share of the sky
