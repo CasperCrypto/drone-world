@@ -21,6 +21,7 @@ const SPECIES_KEYS = ['pine', 'spruce', 'oak', 'birch'];
 const VARIANTS_PER_SPECIES = 2;
 const ATLAS_VIEWS = 8;
 const ATLAS_CELL = 256;
+const BAKE_ELEVATION = 18 * Math.PI / 180; // impostors are seen from above more often than from the side
 
 function rng(seed) {
   let s = seed >>> 0 || 1;
@@ -255,14 +256,15 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
       const bark = new THREE.Mesh(t.bark);
       const leaves = new THREE.Mesh(t.leaves);
       scene.add(bark, leaves);
-      const half = Math.max(t.crownRadius, t.height / 2) * 1.08;
+      const half = Math.max(t.crownRadius, t.height / 2) * 1.15;
       const centerY = t.height / 2;
       Object.assign(cam, { left: -half, right: half, top: half, bottom: -half, near: 0.1, far: 200 });
       cam.updateProjectionMatrix();
       variant.impostor = { width: half * 2, height: half * 2, centerY, row };
       for (let view = 0; view < cols; view++) {
         const a = (view / cols) * Math.PI * 2;
-        cam.position.set(Math.sin(a) * 80, centerY, Math.cos(a) * 80);
+        const ce = Math.cos(BAKE_ELEVATION);
+        cam.position.set(Math.sin(a) * 80 * ce, centerY + 80 * Math.sin(BAKE_ELEVATION), Math.cos(a) * 80 * ce);
         cam.lookAt(0, centerY, 0);
         for (const [rt, kind] of [[colorRT, 'color'], [normalRT, 'normal']]) {
           bark.material = kind === 'color' ? albedoMat(variant.barkMat.map, false) : normalMat(null, false);
@@ -327,7 +329,7 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
         uNormal: { value: this.atlas.normal },
         uCols: { value: this.atlas.cols },
         uRows: { value: this.atlas.rows },
-        uTreeH: { value: 20 },
+        uBakeElev: { value: BAKE_ELEVATION },
         ...pick(env, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uAmbient', 'uGroundAmbient', 'uFogColor', 'uFogDensity']),
       },
       vertexShader: /* glsl */ `
@@ -366,6 +368,7 @@ uniform vec3 uAmbient;
 uniform vec3 uGroundAmbient;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
+uniform float uBakeElev;
 varying vec2 vUv;
 varying vec3 vRight;
 varying vec3 vToCam;
@@ -374,7 +377,10 @@ void main() {
   vec4 c = texture2D(uColor, vUv);
   if (c.a < 0.35) discard;
   vec3 n = texture2D(uNormal, vUv).xyz * 2.0 - 1.0;
-  vec3 N = normalize(vRight * n.x + vec3(0.0, 1.0, 0.0) * n.y + vToCam * n.z);
+  // Baked in the view of a camera tilted down by uBakeElev: turn back to world axes.
+  float ce = cos(uBakeElev);
+  float se = sin(uBakeElev);
+  vec3 N = normalize(vRight * n.x + vec3(0.0, 1.0, 0.0) * (ce * n.y + se * n.z) + vToCam * (ce * n.z - se * n.y));
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 amb = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
   // Same units as three.js lights: irradiance times albedo / pi; trees shade themselves a little.

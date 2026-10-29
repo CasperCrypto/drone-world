@@ -36,7 +36,7 @@ const smooth = (e0, e1, x) => {
 
 // Per-layer colour correction (linear RGB multipliers) for the scans.
 const TINTS = [
-  [0.8, 1.06, 0.6], // grass: the scan is half brown; push it toward a summer green
+  [0.74, 1.06, 0.52], // grass: the scan is half brown; push it toward a summer green
   [0.95, 0.98, 0.72], // dry grass
   [0.95, 0.92, 0.88], // forest floor
   [0.8, 0.8, 0.82], // rock (the scan is reddish; pull it toward grey)
@@ -428,7 +428,7 @@ float tAO;
   float m1 = dot(texture(uGAlbedo, vec3(xz / 171.0, 7.0)).rgb, vec3(0.3, 0.59, 0.11));
   float m2 = dot(texture(uGAlbedo, vec3(xz / 47.0 + 0.5, 7.0)).rgb, vec3(0.3, 0.59, 0.11));
   float grassy = (w[0] + w[1]) / (w[0] + w[1] + w[2] + w[3] + w[4] + w[5] + w[6] + 1e-4);
-  col *= mix(1.0, 0.62 + 0.85 * (m1 * 0.6 + m2 * 0.4), 0.55 * grassy);
+  col *= mix(1.0, 0.62 + 0.85 * (m1 * 0.6 + m2 * 0.4), 0.4 * grassy);
 #ifdef DW_FAR
   // Distant forests: a canopy of mottled dark greens on the raised mesh.
   float canopy = vSplat1.w;
