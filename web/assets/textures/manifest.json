@@ -1,0 +1,245 @@
+{
+  "resolution": "1k",
+  "source": "Poly Haven (CC0)",
+  "slots": {
+    "grass": {
+      "id": "leafy_grass",
+      "name": "Leafy Grass",
+      "authors": [
+        "Charlotte Baglioni"
+      ],
+      "dimensionsMm": [
+        2000,
+        2000
+      ],
+      "url": "https://polyhaven.com/a/leafy_grass",
+      "files": {
+        "diff": "leafy_grass/leafy_grass_diff_1k.jpg",
+        "nor_gl": "leafy_grass/leafy_grass_nor_gl_1k.jpg",
+        "arm": "leafy_grass/leafy_grass_arm_1k.jpg"
+      }
+    },
+    "meadow": {
+      "id": "aerial_grass_rock",
+      "name": "Aerial Grass Rock",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        15000,
+        15000
+      ],
+      "url": "https://polyhaven.com/a/aerial_grass_rock",
+      "files": {
+        "diff": "aerial_grass_rock/aerial_grass_rock_diff_1k.jpg",
+        "nor_gl": "aerial_grass_rock/aerial_grass_rock_nor_gl_1k.jpg",
+        "arm": "aerial_grass_rock/aerial_grass_rock_arm_1k.jpg"
+      }
+    },
+    "forest": {
+      "id": "forrest_ground_01",
+      "name": "Forest Ground 01",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        2000,
+        2000
+      ],
+      "url": "https://polyhaven.com/a/forrest_ground_01",
+      "files": {
+        "diff": "forrest_ground_01/forrest_ground_01_diff_1k.jpg",
+        "nor_gl": "forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg",
+        "arm": "forrest_ground_01/forrest_ground_01_arm_1k.jpg"
+      }
+    },
+    "rock": {
+      "id": "rocky_terrain_02",
+      "name": "Rocky Terrain 02",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "dimensionsMm": [
+        90000,
+        90000
+      ],
+      "url": "https://polyhaven.com/a/rocky_terrain_02",
+      "files": {
+        "diff": "rocky_terrain_02/rocky_terrain_02_diff_1k.jpg",
+        "nor_gl": "rocky_terrain_02/rocky_terrain_02_nor_gl_1k.jpg",
+        "arm": "rocky_terrain_02/rocky_terrain_02_arm_1k.jpg"
+      }
+    },
+    "sand": {
+      "id": "coast_sand_01",
+      "name": "Coast Sand 01",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        15000,
+        15000
+      ],
+      "url": "https://polyhaven.com/a/coast_sand_01",
+      "files": {
+        "diff": "coast_sand_01/coast_sand_01_diff_1k.jpg",
+        "nor_gl": "coast_sand_01/coast_sand_01_nor_gl_1k.jpg",
+        "arm": "coast_sand_01/coast_sand_01_arm_1k.jpg"
+      }
+    },
+    "dirt": {
+      "id": "brown_mud_02",
+      "name": "Brown Mud 02",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        1299.996018409729,
+        1299.996018409729
+      ],
+      "url": "https://polyhaven.com/a/brown_mud_02",
+      "files": {
+        "diff": "brown_mud_02/brown_mud_02_diff_1k.jpg",
+        "nor_gl": "brown_mud_02/brown_mud_02_nor_gl_1k.jpg",
+        "arm": "brown_mud_02/brown_mud_02_arm_1k.jpg"
+      }
+    },
+    "snow": {
+      "id": "snow_02",
+      "name": "Snow 02",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        2000,
+        2000
+      ],
+      "url": "https://polyhaven.com/a/snow_02",
+      "files": {
+        "diff": "snow_02/snow_02_diff_1k.jpg",
+        "nor_gl": "snow_02/snow_02_nor_gl_1k.jpg",
+        "arm": "snow_02/snow_02_arm_1k.jpg"
+      }
+    },
+    "asphalt": {
+      "id": "asphalt_02",
+      "name": "Asphalt 02",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        3000.000238418579,
+        3000
+      ],
+      "url": "https://polyhaven.com/a/asphalt_02",
+      "files": {
+        "diff": "asphalt_02/asphalt_02_diff_1k.jpg",
+        "nor_gl": "asphalt_02/asphalt_02_nor_gl_1k.jpg",
+        "arm": "asphalt_02/asphalt_02_arm_1k.jpg"
+      }
+    },
+    "concrete": {
+      "id": "concrete_floor_02",
+      "name": "Concrete Floor 02",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        2000,
+        2000
+      ],
+      "url": "https://polyhaven.com/a/concrete_floor_02",
+      "files": {
+        "diff": "concrete_floor_02/concrete_floor_02_diff_1k.jpg",
+        "nor_gl": "concrete_floor_02/concrete_floor_02_nor_gl_1k.jpg",
+        "arm": "concrete_floor_02/concrete_floor_02_arm_1k.jpg"
+      }
+    },
+    "plaster": {
+      "id": "painted_plaster_wall",
+      "name": "Painted Plaster Wall",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "dimensionsMm": [
+        2000,
+        2000
+      ],
+      "url": "https://polyhaven.com/a/painted_plaster_wall",
+      "files": {
+        "diff": "painted_plaster_wall/painted_plaster_wall_diff_1k.jpg",
+        "nor_gl": "painted_plaster_wall/painted_plaster_wall_nor_gl_1k.jpg",
+        "arm": "painted_plaster_wall/painted_plaster_wall_arm_1k.jpg"
+      }
+    },
+    "brick": {
+      "id": "red_brick_03",
+      "name": "Red Brick 03",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "dimensionsMm": [
+        1000,
+        1000
+      ],
+      "url": "https://polyhaven.com/a/red_brick_03",
+      "files": {
+        "diff": "red_brick_03/red_brick_03_diff_1k.jpg",
+        "nor_gl": "red_brick_03/red_brick_03_nor_gl_1k.jpg",
+        "arm": "red_brick_03/red_brick_03_arm_1k.jpg"
+      }
+    },
+    "roof": {
+      "id": "clay_roof_tiles_02",
+      "name": "Clay Roof Tiles 02",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "dimensionsMm": [
+        2500,
+        2500
+      ],
+      "url": "https://polyhaven.com/a/clay_roof_tiles_02",
+      "files": {
+        "diff": "clay_roof_tiles_02/clay_roof_tiles_02_diff_1k.jpg",
+        "nor_gl": "clay_roof_tiles_02/clay_roof_tiles_02_nor_gl_1k.jpg",
+        "arm": "clay_roof_tiles_02/clay_roof_tiles_02_arm_1k.jpg"
+      }
+    },
+    "metal": {
+      "id": "corrugated_iron_02",
+      "name": "Corrugated Iron 02",
+      "authors": [
+        "Jenelle van Heerden",
+        "Sergej Majboroda"
+      ],
+      "dimensionsMm": [
+        2700.000047683716,
+        2700.000047683716
+      ],
+      "url": "https://polyhaven.com/a/corrugated_iron_02",
+      "files": {
+        "diff": "corrugated_iron_02/corrugated_iron_02_diff_1k.jpg",
+        "nor_gl": "corrugated_iron_02/corrugated_iron_02_nor_gl_1k.jpg",
+        "arm": "corrugated_iron_02/corrugated_iron_02_arm_1k.jpg"
+      }
+    },
+    "wood": {
+      "id": "wood_planks",
+      "name": "Wood Planks",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "dimensionsMm": [
+        1499.999761581421,
+        1499.999761581421
+      ],
+      "url": "https://polyhaven.com/a/wood_planks",
+      "files": {
+        "diff": "wood_planks/wood_planks_diff_1k.jpg",
+        "nor_gl": "wood_planks/wood_planks_nor_gl_1k.jpg",
+        "arm": "wood_planks/wood_planks_arm_1k.jpg"
+      }
+    }
+  }
+}
