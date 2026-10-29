@@ -6,10 +6,11 @@ CC0 (public domain); credit is not required but given gladly. Fetched by
 
 | Used as | Texture | Authors | Licence |
 |---|---|---|---|
-| grass | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni | CC0 |
+| grass | [Forest Ground 01](https://polyhaven.com/a/forrest_ground_01) | Rob Tuytel | CC0 |
+| grassDry | [Leafy Grass](https://polyhaven.com/a/leafy_grass) | Charlotte Baglioni | CC0 |
 | meadow | [Aerial Grass Rock](https://polyhaven.com/a/aerial_grass_rock) | Rob Tuytel | CC0 |
-| forest | [Forest Ground 01](https://polyhaven.com/a/forrest_ground_01) | Rob Tuytel | CC0 |
-| rock | [Rocky Terrain 02](https://polyhaven.com/a/rocky_terrain_02) | Amal Kumar | CC0 |
+| forest | [Forest Leaves 02](https://polyhaven.com/a/forest_leaves_02) | Rob Tuytel | CC0 |
+| rock | [Rock Face](https://polyhaven.com/a/rock_face) | Greg Zaal, Dario Barresi | CC0 |
 | sand | [Coast Sand 01](https://polyhaven.com/a/coast_sand_01) | Rob Tuytel | CC0 |
 | dirt | [Brown Mud 02](https://polyhaven.com/a/brown_mud_02) | Rob Tuytel | CC0 |
 | snow | [Snow 02](https://polyhaven.com/a/snow_02) | Rob Tuytel | CC0 |
