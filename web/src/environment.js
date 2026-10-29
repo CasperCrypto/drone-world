@@ -70,6 +70,12 @@ export class Environment {
     return p && p !== 'rain' && this.weather.preset !== 'snow' ? `${w} (${p})` : w;
   }
 
+  /** Apply the wind settings (made gustier by stormy weather) and move the gusts on. */
+  updateWind(dt) {
+    this.wind.configure({ speed10: this.windSpeed, fromDeg: this.windFrom, gustiness: GUSTINESS[this.gustKey] * this.weather.cur.gust });
+    this.wind.advance(dt);
+  }
+
   /** Wind (m/s, three.js axes) at a world position. */
   windAt(p) {
     return this.wind.sample(p.x, p.y, p.z);
@@ -85,9 +91,7 @@ export class Environment {
       this.date = { y: next.getUTCFullYear(), m: next.getUTCMonth(), d: next.getUTCDate() };
     }
 
-    // Wind: the settings, made gustier by stormy weather.
-    this.wind.configure({ speed10: this.windSpeed, fromDeg: this.windFrom, gustiness: GUSTINESS[this.gustKey] * this.weather.cur.gust });
-    this.wind.advance(dt);
+    this.updateWind(dt);
     const near = this.wind.sample(camera.position.x, camera.position.y, camera.position.z);
 
     // Weather, then sky and light.

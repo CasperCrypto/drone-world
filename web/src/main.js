@@ -20,6 +20,7 @@ import { PRESETS as WEATHER } from './weather.js';
 import { DroneMesh } from './drone-mesh.js';
 import { Controls } from './controls.js';
 import { Post } from './post.js';
+import { Sound } from './audio.js';
 import { QUALITY, loadQualityKey, saveQualityKey } from './quality.js';
 import { PAD } from './layout.js';
 import {
@@ -80,6 +81,10 @@ let grass;
 let envr;
 let post;
 let reflection = null;
+const sound = new Sound();
+let resScale = 1; // automatic resolution scale, lowered when frames get slow
+let perfClock = 0;
+let perfFrames = 0;
 const drone = new DroneMesh();
 const controls = new Controls($('touch'));
 const model = new FlightModel();
@@ -249,7 +254,7 @@ function updateHud(dt) {
   $('hud-input').textContent = controls.source;
   $('hud-time').textContent = `${envr.clock}${envr.timeScale ? ' ▸' : ''}`;
   $('hud-weather').textContent = `${envr.weatherLabel}, ${envr.weather.temperature.toFixed(0)} °C`;
-  $('hud-fps').textContent = `${fps.toFixed(0)} fps · ${quality.label}`;
+  $('hud-fps').textContent = `${fps.toFixed(0)} fps · ${quality.label}${resScale < 0.99 ? ` · ${Math.round(resScale * 100)}% res` : ''}${sound.muted ? ' · muted' : ''}`;
   $('hud-gate').textContent = `${world.nextGate + 1} / ${world.gates.length}`;
   $('hud-lap').textContent = world.lapStart === null ? '—' : fmtTime(simTime - world.lapStart);
   $('hud-last').textContent = fmtTime(world.lastLap);
@@ -272,6 +277,7 @@ function closeSheets() {
   $('help').hidden = true;
   $('settings').hidden = true;
   paused = false;
+  sound.start(); // browsers allow sound only after a click or key press
   canvas.focus?.();
 }
 
@@ -378,6 +384,8 @@ function wireUi() {
   document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => setMode(b.dataset.mode)));
   $('opt-shadows').addEventListener('change', (e) => { envr.sky.shadowsOn = e.target.checked; });
   $('opt-light').addEventListener('change', (e) => drone.setHeadlight(e.target.checked));
+  $('opt-sound').addEventListener('change', (e) => { sound.start(); sound.setMuted(!e.target.checked); });
+  $('opt-volume').addEventListener('input', (e) => sound.setVolume(Number(e.target.value)));
   $('model-file').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -403,6 +411,11 @@ function wireUi() {
   controls.on('course', () => { world.resetCourse(); show('Gate course restarted. Fly through the green gate.'); });
   controls.on('settings', () => ($('settings').hidden ? openSheet('settings') : closeSheets()));
   controls.on('help', () => ($('help').hidden ? openSheet('help') : closeSheets()));
+  controls.on('mute', () => {
+    sound.setMuted(!sound.muted);
+    $('opt-sound').checked = !sound.muted;
+    show(sound.muted ? 'Sound off' : 'Sound on', 1200);
+  });
   controls.on('light', () => {
     drone.setHeadlight(!drone.headlightOn);
     $('opt-light').checked = drone.headlightOn;
@@ -410,8 +423,31 @@ function wireUi() {
   });
 }
 
+// Keep the frame rate up: lower the render resolution when frames are slow,
+// raise it again when there is headroom.
+function adaptResolution(dt) {
+  perfClock += dt;
+  perfFrames++;
+  if (perfClock < 1.5) return;
+  const rate = perfFrames / perfClock;
+  perfClock = 0;
+  perfFrames = 0;
+  if (paused || document.hidden) return;
+  let next = resScale;
+  if (rate < 45 && resScale > 0.5) next = Math.max(0.5, resScale * 0.85);
+  if (rate < 28 && resScale <= 0.5 && qualityKey !== 'low' && !adaptResolution.hinted) {
+    adaptResolution.hinted = true;
+    show(`Running at ${rate.toFixed(0)} frames per second. For smoother flight choose a lower quality in Settings → Graphics.`, 7000);
+  }
+  else if (rate > 58 && resScale < 1) next = Math.min(1, resScale * 1.08);
+  if (Math.abs(next - resScale) > 0.01) {
+    resScale = next;
+    resize();
+  }
+}
+
 function resize() {
-  const ratio = Math.min(window.devicePixelRatio || 1, quality.pixelRatio);
+  const ratio = Math.min(window.devicePixelRatio || 1, quality.pixelRatio) * resScale;
   renderer.setPixelRatio(ratio);
   renderer.setSize(window.innerWidth, window.innerHeight, false);
   post?.setSize(window.innerWidth, window.innerHeight, ratio);
@@ -422,23 +458,27 @@ function resize() {
 window.addEventListener('resize', resize);
 
 // --- main loop -----------------------------------------------------------------
+// One step of the simulation: wind at the drone, flight model, collisions, gates.
+function simulate(dt, sticks) {
+  windAtDrone = envr.windAt(dronePos);
+  model.setWind(fromThreePosition(windAtDrone.x, windAtDrone.y, windAtDrone.z));
+  prevPos.copy(dronePos);
+  model.step(sticks, dt);
+  simTime += dt;
+  syncDrone();
+  resolveCollisions();
+  if (!model.state.crashed && world.updateCourse(prevPos, dronePos, simTime)) {
+    const g = world.nextGate;
+    show(g === 1 && world.lastLap !== null ? `Lap ${fmtTime(world.lastLap)}` : `Gate ${g === 0 ? world.gates.length : g} ✓`, 1200);
+  }
+}
+
 const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.1);
-  windAtDrone = envr.windAt(dronePos);
-  model.setWind(fromThreePosition(windAtDrone.x, windAtDrone.y, windAtDrone.z));
   if (!paused) {
-    const sticks = controls.poll(dt, model.mode === Mode.HOLD, model.hoverStick());
-    prevPos.copy(dronePos);
-    model.step(sticks, dt);
-    simTime += dt;
-    syncDrone();
-    resolveCollisions();
-    if (!model.state.crashed && world.updateCourse(prevPos, dronePos, simTime)) {
-      const g = world.nextGate;
-      show(g === 1 && world.lastLap !== null ? `Lap ${fmtTime(world.lastLap)}` : `Gate ${g === 0 ? world.gates.length : g} ✓`, 1200);
-    }
+    simulate(dt, controls.poll(dt, model.mode === Mode.HOLD, model.hoverStick()));
   } else {
     controls.poll(0, true, 0); // keep gamepad buttons and radio learning live in menus
   }
@@ -449,6 +489,27 @@ function frame() {
   grass.update(camera, terrain.heightAt(camera.position.x, camera.position.z));
   updateHud(dt);
   updateRadioPanel();
+  const v = model.state.velocity;
+  const pilotWind = camMode === 'ground' ? envr.windAt(camera.position) : windAtDrone;
+  // Air moving past the microphone: the pilot's on the ground view, the drone's otherwise
+  // (velocity is in the flight model's frame, so the wind is converted to it).
+  const wm = fromThreePosition(windAtDrone.x, windAtDrone.y, windAtDrone.z);
+  const air = camMode === 'ground'
+    ? Math.hypot(pilotWind.x, pilotWind.z)
+    : Math.hypot(v.x - wm.x, v.y - wm.y, v.z - wm.z);
+  sound.update(dt, {
+    thrust: model.state.thrustFraction,
+    style: PRESETS[presetKey].style,
+    distance: camMode === 'fpv' ? 0.3 : camera.position.distanceTo(dronePos),
+    micWind: air,
+    rain: envr.weather.cur.precip * (envr.weather.precipType === 'rain' ? 1 : 0.15),
+    lightning: envr.weather.lightning,
+    day: light.day,
+    night: light.night,
+    temperature: envr.weather.temperature,
+    crashed: model.state.crashed,
+  });
+  adaptResolution(dt);
   renderer.info.reset();
   reflection?.render(renderer, scene, camera);
   post.render(dt);
@@ -517,6 +578,14 @@ async function start() {
       camPos.copy(dronePos).add(new THREE.Vector3(-Math.cos(heading) * 2.2, 0.7, Math.sin(heading) * 2.2));
     },
     pause(on = true) { paused = on; },
+    // Run the simulation without drawing (for tests): seconds at 60 Hz with fixed sticks.
+    simulate(seconds, sticks = { throttle: 0, yaw: 0, pitch: 0, roll: 0 }) {
+      for (let t = 0; t < seconds; t += 1 / 60) {
+        envr.updateWind(1 / 60);
+        simulate(1 / 60, sticks);
+      }
+      return { position: dronePos.clone(), crashed: model.state.crashed, speed: model.state.velocity.length() };
+    },
     get stats() {
       const r = renderer.info.render;
       return { triangles: r.triangles, calls: r.calls, fps, trees: forest.counts };

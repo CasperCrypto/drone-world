@@ -57,9 +57,10 @@ export class Grass {
       uGridN: { value: GRID },
     };
     const mat = new THREE.MeshStandardMaterial({ side: THREE.DoubleSide, roughness: 0.85, metalness: 0 });
+    this.material = mat;
     mat.onBeforeCompile = (shader) => {
       Object.assign(shader.uniforms, this.uniforms);
-      linkEnv(shader, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uSnow']);
+      linkEnv(shader, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uSnow', 'uWetness']);
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', `#include <common>
 attribute vec3 aOffset;
@@ -71,6 +72,7 @@ uniform sampler2DArray uGAlbedo;
 uniform float uHalf;
 uniform float uGridN;
 uniform float uSnow;
+uniform float uWetness;
 varying vec3 vGrassColor;
 varying float vGrassT;
 varying vec3 vGrassWPos;
@@ -95,7 +97,7 @@ float dwR = aOffset.z;
 vec4 dwMap = texture(uGrassMap, (dwXZ + uHalf) / (2.0 * uHalf));
 float dwDist = distance(dwXZ, uCamXZ);
 float dwFade = 1.0 - smoothstep(uPatch * 0.3, uPatch * 0.5, dwDist);
-float dwKeep = smoothstep(dwR - 0.08, dwR, dwMap.r) * dwFade * (1.0 - uSnow * 0.85);
+float dwKeep = smoothstep(dwR - 0.08, dwR, dwMap.r) * dwFade * (1.0 - smoothstep(0.2, 0.6, uSnow));
 float dwH = mix(0.22, 0.62, fract(dwR * 7.13)) * (0.55 + 0.5 * dwMap.r) * (1.0 - 0.3 * dwMap.g) * dwKeep;
 float dwW = mix(0.03, 0.055, fract(dwR * 3.7)) * (1.0 + dwDist * 0.02);
 float dwYaw = dwR * 81.7 + position.z * 2.1;
@@ -116,8 +118,10 @@ vec3 objectNormal = normalize(vec3(dwFwd.x, 0.0, dwFwd.y) * 0.35 + vec3(0.0, 1.0
 // Colour: the ground scan under the tuft, darker at the root, lighter and drier at the tip.
 vec3 dwGround = mix(textureLod(uGAlbedo, vec3(dwXZ / 2.0, 0.0), 7.0).rgb,
                     textureLod(uGAlbedo, vec3(dwXZ / 2.0, 1.0), 7.0).rgb, dwMap.g);
-vec3 dwTipTint = mix(vec3(1.05, 1.2, 0.75), vec3(1.35, 1.2, 0.85), dwMap.g);
+vec3 dwTipTint = mix(vec3(0.88, 1.18, 0.6), vec3(1.2, 1.12, 0.72), dwMap.g);
 vGrassColor = dwGround * mix(vec3(0.45), dwTipTint, dwT) * (0.85 + 0.3 * fract(dwR * 11.3)) * (1.0 - 0.55 * dwMap.b); // darker under trees, like the ground
+// Wet blades: darker and a little more saturated.
+vGrassColor *= mix(vec3(1.0), vec3(0.62, 0.7, 0.6), uWetness);
 vGrassT = dwT;
 vGrassWPos = dwPos;
 vGrassOpen = 1.0 - dwMap.b; // under trees the sun rarely shines through

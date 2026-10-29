@@ -51,7 +51,7 @@
   <div class="bottom">
     <button type="button" class="btn" id="btn-settings">Settings <kbd>Esc</kbd></button>
     <button type="button" class="btn" id="btn-help">Controls <kbd>H</kbd></button>
-    <span class="hint">M mode · C camera · R reset · P drone · L light · G restart course</span>
+    <span class="hint">M mode · C camera · R reset · P drone · L light · K sound · G restart course</span>
   </div>
 </div>
 
@@ -75,6 +75,7 @@
           <tr><td><kbd>M</kbd></td><td>Flight mode: Hold → Angle → Acro</td></tr>
           <tr><td><kbd>C</kbd></td><td>Camera: chase → FPV → pilot on the ground</td></tr>
           <tr><td><kbd>L</kbd></td><td>Drone headlight on / off</td></tr>
+          <tr><td><kbd>K</kbd></td><td>Sound on / off</td></tr>
           <tr><td><kbd>R</kbd></td><td>Back to the take-off pad</td></tr>
           <tr><td><kbd>P</kbd></td><td>Camera drone ↔ FPV 5-inch</td></tr>
         </table>
@@ -150,9 +151,13 @@
       <div>
         <h2>Graphics</h2>
         <label class="row" for="opt-quality">Quality <select id="opt-quality"></select></label>
-        <p class="note" id="quality-note">Low for phones and old laptops, High for a gaming PC, Ultra for a strong graphics card.</p>
+        <p class="note" id="quality-note">Low for phones and old laptops, High for a gaming PC, Ultra for a strong graphics card. If frames get slow, the resolution drops automatically (shown next to the frame rate).</p>
         <button type="button" class="btn" id="btn-reload" hidden>Reload now</button>
         <label class="row" for="opt-shadows"><input type="checkbox" id="opt-shadows" checked> Shadows</label>
+        <h2>Sound</h2>
+        <label class="row" for="opt-sound"><input type="checkbox" id="opt-sound" checked> Sound on <kbd>K</kbd></label>
+        <label class="row" for="opt-volume">Volume</label>
+        <input type="range" id="opt-volume" min="0" max="1" step="0.05" value="0.8">
         <h2>Radio (USB joystick)</h2>
         <p class="note" id="radio-status">No radio connected. Plug it in by USB in joystick mode and move a stick.</p>
         <table class="radio" id="radio-table">

@@ -132,7 +132,9 @@ vec2 dwRipples(vec2 p, float t) {
 #if defined( RE_IndirectSpecular )
 if (uReflOn > 0.5) {
   vec4 rp = uReflMatrix * vec4(vWaterPos, 1.0);
-  vec2 ruv = rp.xy / rp.w + (normal.xy) * 0.035;
+  // Distort only by how much the waves tilt the surface away from flat.
+  vec3 flatN = normalize((viewMatrix * vec4(0.0, 1.0, 0.0, 0.0)).xyz);
+  vec2 ruv = rp.xy / rp.w + (normal.xy - flatN.xy) * 0.12;
   radiance = texture2D(uReflection, clamp(ruv, vec2(0.001), vec2(0.999))).rgb;
 }
 #endif`)

@@ -324,7 +324,7 @@ void main() {
     this.hemi.intensity = hemiIntensity;
 
     // Exposure: like eyes adapting, so night is dark but readable.
-    this.exposure = THREE.MathUtils.lerp(2.6, 0.82, smooth(-12, 8, sun.elevation)) * (1 + 0.25 * this.cloudCover * day);
+    this.exposure = THREE.MathUtils.lerp(2.6, 0.82, smooth(-12, 8, sun.elevation)) * (1 + 0.6 * this.cloudCover * day);
 
     // Shared uniforms for custom shaders.
     env.uSunDir.value.copy(this.keyDir);

@@ -21,6 +21,7 @@ const SPECIES_KEYS = ['pine', 'spruce', 'oak', 'birch'];
 const VARIANTS_PER_SPECIES = 2;
 const ATLAS_VIEWS = 8;
 const ATLAS_CELL = 256;
+const BAKE_ELEVATION = 18 * Math.PI / 180; // impostors are seen from above more often than from the side
 
 function rng(seed) {
   let s = seed >>> 0 || 1;
@@ -71,11 +72,15 @@ gl_Position = projectionMatrix * mvPosition;`;
 function addSway(material, treeH, cacheKey, extraFragment) {
   material.customProgramCacheKey = () => cacheKey;
   material.onBeforeCompile = (shader) => {
-    linkEnv(shader, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor']);
+    linkEnv(shader, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uSnow']);
     shader.uniforms.uTreeH = { value: treeH };
     shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', `#include <common>\n${SWAY_GLSL}`)
-      .replace('#include <project_vertex>', PROJECT_WITH_SWAY);
+      .replace('#include <common>', `#include <common>\n${SWAY_GLSL}\nvarying float vSnowUp;`)
+      .replace('#include <project_vertex>', `${PROJECT_WITH_SWAY}\nvSnowUp = normalize(mat3(modelMatrix) * normal).y;`);
+    // Snow settles on the upper side of branches and leaves.
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uSnow;\nvarying float vSnowUp;')
+      .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.82, 0.85, 0.9), uSnow * 0.75 * smoothstep(0.15, 0.7, vSnowUp));');
     if (extraFragment) extraFragment(shader);
   };
 }
@@ -89,6 +94,8 @@ export class Forest {
     this.trees = [];
     this.grid = new Map();
     this.lastBucket = new THREE.Vector3(1e9, 0, 0);
+    this.dir = new THREE.Vector3();
+    this.lastDir = new THREE.Vector3();
   }
 
   /** Builds geometry and materials, plants the trees, bakes impostors. */
@@ -135,6 +142,8 @@ export class Forest {
     const leafMat = new THREE.MeshStandardMaterial({
       map: variant.leafTex,
       alphaTest: 0.42,
+      // With multisampling, soft leaf edges instead of hard, flickering cut-outs.
+      alphaToCoverage: this.quality.msaa > 0,
       side: THREE.DoubleSide,
       roughness: 0.78,
       metalness: 0,
@@ -255,14 +264,15 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
       const bark = new THREE.Mesh(t.bark);
       const leaves = new THREE.Mesh(t.leaves);
       scene.add(bark, leaves);
-      const half = Math.max(t.crownRadius, t.height / 2) * 1.08;
+      const half = Math.max(t.crownRadius, t.height / 2) * 1.15;
       const centerY = t.height / 2;
       Object.assign(cam, { left: -half, right: half, top: half, bottom: -half, near: 0.1, far: 200 });
       cam.updateProjectionMatrix();
       variant.impostor = { width: half * 2, height: half * 2, centerY, row };
       for (let view = 0; view < cols; view++) {
         const a = (view / cols) * Math.PI * 2;
-        cam.position.set(Math.sin(a) * 80, centerY, Math.cos(a) * 80);
+        const ce = Math.cos(BAKE_ELEVATION);
+        cam.position.set(Math.sin(a) * 80 * ce, centerY + 80 * Math.sin(BAKE_ELEVATION), Math.cos(a) * 80 * ce);
         cam.lookAt(0, centerY, 0);
         for (const [rt, kind] of [[colorRT, 'color'], [normalRT, 'normal']]) {
           bark.material = kind === 'color' ? albedoMat(variant.barkMat.map, false) : normalMat(null, false);
@@ -327,8 +337,8 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
         uNormal: { value: this.atlas.normal },
         uCols: { value: this.atlas.cols },
         uRows: { value: this.atlas.rows },
-        uTreeH: { value: 20 },
-        ...pick(env, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uAmbient', 'uGroundAmbient', 'uFogColor', 'uFogDensity']),
+        uBakeElev: { value: BAKE_ELEVATION },
+        ...pick(env, ['uTime', 'uWindDir', 'uWind10', 'uGustK', 'uGustAmp', 'uGustPhase', 'uSunDir', 'uSunColor', 'uAmbient', 'uGroundAmbient', 'uFogColor', 'uFogDensity', 'uSnow']),
       },
       vertexShader: /* glsl */ `
 attribute vec3 iPos;
@@ -366,6 +376,8 @@ uniform vec3 uAmbient;
 uniform vec3 uGroundAmbient;
 uniform vec3 uFogColor;
 uniform float uFogDensity;
+uniform float uBakeElev;
+uniform float uSnow;
 varying vec2 vUv;
 varying vec3 vRight;
 varying vec3 vToCam;
@@ -374,11 +386,15 @@ void main() {
   vec4 c = texture2D(uColor, vUv);
   if (c.a < 0.35) discard;
   vec3 n = texture2D(uNormal, vUv).xyz * 2.0 - 1.0;
-  vec3 N = normalize(vRight * n.x + vec3(0.0, 1.0, 0.0) * n.y + vToCam * n.z);
+  // Baked in the view of a camera tilted down by uBakeElev: turn back to world axes.
+  float ce = cos(uBakeElev);
+  float se = sin(uBakeElev);
+  vec3 N = normalize(vRight * n.x + vec3(0.0, 1.0, 0.0) * (ce * n.y + se * n.z) + vToCam * (ce * n.z - se * n.y));
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 amb = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
   // Same units as three.js lights: irradiance times albedo / pi; trees shade themselves a little.
   vec3 albedo = c.rgb / max(c.a, 0.35);
+  albedo = mix(albedo, vec3(0.82, 0.85, 0.9), uSnow * 0.75 * smoothstep(0.15, 0.7, N.y));
   // Like the leaf material: direct light, sky light, a share of the sky
   // reflection map, and some light through the leaves.
   vec3 col = albedo * ((uSunColor * ndl * 0.8 + amb * 1.3) * 0.31831 + uSunColor * 0.045);
@@ -396,8 +412,13 @@ void main() {
   /** Re-sort trees into near / mid / far when the camera has moved. */
   update(camera, force = false) {
     const cam = camera.position;
-    if (!force && cam.distanceToSquared(this.lastBucket) < 36) return;
+    // Re-sort after moving 6 m or turning 20 degrees (mid trees outside the
+    // view are skipped, so turning must bring them back at once).
+    camera.getWorldDirection(this.dir);
+    const turned = this.dir.dot(this.lastDir) < Math.cos(20 * Math.PI / 180);
+    if (!force && !turned && cam.distanceToSquared(this.lastBucket) < 36) return;
     this.lastBucket.copy(cam);
+    this.lastDir.copy(this.dir);
     const nearR = this.quality.treeNear;
     const midR = this.quality.treeMid;
     const m = new THREE.Matrix4();
@@ -422,7 +443,7 @@ void main() {
       const mid = !near && d < midR + (t.lod === 1 ? 10 : 0);
       if (!near && d > 60) {
         sphere.center.set(t.x, t.y + t.height / 2, t.z);
-        sphere.radius = t.height;
+        sphere.radius = t.height + 25; // margin for turning between re-sorts
         if (!frustum.intersectsSphere(sphere)) { t.lod = -1; continue; }
       }
       if (near || mid) {
