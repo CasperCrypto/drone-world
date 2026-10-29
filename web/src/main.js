@@ -21,6 +21,7 @@ import { DroneMesh } from './drone-mesh.js';
 import { Controls } from './controls.js';
 import { Post } from './post.js';
 import { Sound } from './audio.js';
+import { gpuInfo, gpuAdvice } from './gpu.js';
 import { QUALITY, loadQualityKey, saveQualityKey } from './quality.js';
 import { PAD } from './layout.js';
 import {
@@ -62,6 +63,7 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.info.autoReset = false; // counted per frame in frame(), including shadows
+const gpu = gpuInfo(renderer);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(70, 1, 0.08, 12000);
@@ -423,8 +425,21 @@ function wireUi() {
   });
 }
 
-// Keep the frame rate up: lower the render resolution when frames are slow,
-// raise it again when there is headroom.
+// Keep the frame rate up. When frames are slow, first lower the resolution a
+// little, then switch off the most expensive extras one by one (a sharp
+// picture with less grass looks better than a blurry one with more), and
+// only then lower the resolution further. With headroom the resolution
+// comes back up; the extras stay off until the page is reloaded.
+const LIGHTEN = [
+  ['lake reflections off', () => reflection?.disable() ?? false],
+  ['glow off', () => { if (!post.bloom || !post.bloom.enabled) return false; post.bloom.enabled = false; return true; }],
+  ['less grass', () => grass.setDensity(0.55)],
+  ['cheaper shadows', () => envr.sky.setShadowMapSize(1024)],
+  ['fewer detailed trees', () => forest.setDistanceScale(0.7)],
+  ['even less grass', () => grass.setDensity(0.3)],
+  ['nearest trees only', () => forest.setDistanceScale(0.5)],
+];
+let lightenStep = 0;
 function adaptResolution(dt) {
   perfClock += dt;
   perfFrames++;
@@ -434,12 +449,27 @@ function adaptResolution(dt) {
   perfFrames = 0;
   if (paused || document.hidden) return;
   let next = resScale;
-  if (rate < 45 && resScale > 0.5) next = Math.max(0.5, resScale * 0.85);
-  if (rate < 28 && resScale <= 0.5 && qualityKey !== 'low' && !adaptResolution.hinted) {
-    adaptResolution.hinted = true;
-    show(`Running at ${rate.toFixed(0)} frames per second. For smoother flight choose a lower quality in Settings → Graphics.`, 7000);
+  if (rate < 45) {
+    if (resScale > 0.8) {
+      next = Math.max(0.8, resScale * 0.9);
+    } else {
+      let done = false;
+      while (lightenStep < LIGHTEN.length && !done) {
+        const [label, apply] = LIGHTEN[lightenStep++];
+        if (apply()) {
+          done = true;
+          show(`Slow frames: ${label}.`, 1800);
+        }
+      }
+      if (!done && resScale > 0.55) next = Math.max(0.55, resScale * 0.9);
+    }
+  } else if (rate > 58 && resScale < 1) {
+    next = Math.min(1, resScale * 1.08);
   }
-  else if (rate > 58 && resScale < 1) next = Math.min(1, resScale * 1.08);
+  if (rate < 28 && lightenStep >= LIGHTEN.length && !adaptResolution.hinted) {
+    adaptResolution.hinted = true;
+    show(gpuAdvice(gpu) || `Running at ${rate.toFixed(0)} frames per second. Choose a lower quality in Settings → Graphics.`, 9000);
+  }
   if (Math.abs(next - resScale) > 0.01) {
     resScale = next;
     resize();
@@ -540,6 +570,12 @@ async function start() {
   scene.add(drone.root);
   post = new Post(renderer, scene, camera, quality);
   wireUi();
+  $('gpu-name').textContent = `${gpu.name}${gpu.kind === 'software' ? ' (software, no graphics card)' : gpu.kind === 'integrated' ? ' (built-in graphics)' : ''}`;
+  const advice = gpuAdvice(gpu);
+  if (advice) {
+    $('gpu-warning').textContent = advice;
+    $('gpu-warning').hidden = false;
+  }
   resize();
   applyPreset('camera');
   updateCamera(0.016);
@@ -588,7 +624,7 @@ async function start() {
     },
     get stats() {
       const r = renderer.info.render;
-      return { triangles: r.triangles, calls: r.calls, fps, trees: forest.counts };
+      return { triangles: r.triangles, calls: r.calls, fps, trees: forest.counts, gpu: gpu.name, gpuKind: gpu.kind, resScale, lightenStep };
     },
   };
 }

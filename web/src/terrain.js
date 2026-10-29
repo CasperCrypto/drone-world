@@ -412,9 +412,11 @@ float tAO;
     float layer = float(i);
     vec2 uv = xz / uGTile[i];
     vec2 uv2 = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.29 + 0.37;
-    vec3 c = mix(texture(uGAlbedo, vec3(uv, layer)).rgb, texture(uGAlbedo, vec3(uv2, layer)).rgb, max(mixA * 0.55, far * 0.6));
-    vec3 r = texture(uGArm, vec3(uv, layer)).rgb;
-    vec3 n = texture(uGNormal, vec3(uv, layer)).xyz * 2.0 - 1.0;
+    // A positive mip bias reads slightly blurrier texture levels: calmer,
+    // less grainy ground, especially at a distance and at low resolution.
+    vec3 c = mix(texture(uGAlbedo, vec3(uv, layer), 0.8).rgb, texture(uGAlbedo, vec3(uv2, layer), 0.8).rgb, max(mixA * 0.55, far * 0.6));
+    vec3 r = texture(uGArm, vec3(uv, layer), 0.8).rgb;
+    vec3 n = texture(uGNormal, vec3(uv, layer), 1.0).xyz * 2.0 - 1.0;
     float hw = w[i] * pow(0.2 + r.r, 4.0);
     col += c * uGTint[i] * hw;
     nrm += n * hw;
@@ -447,7 +449,7 @@ float tAO;
   col = mix(col, col * 0.3, puddle);
   rough = mix(rough, 0.04, puddle);
   nrm = mix(nrm, vec3(0.0, 0.0, 1.0), puddle);
-  float strength = mix(1.0, 0.35, far);
+  float strength = mix(0.7, 0.25, far);
   vec3 nt = normalize(vec3(nrm.xy * strength, max(nrm.z, 0.25)));
   vec3 T = normalize(vec3(1.0, 0.0, 0.0) - N * N.x);
   vec3 B = normalize(vec3(0.0, 0.0, 1.0) - N * N.z);

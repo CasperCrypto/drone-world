@@ -177,7 +177,15 @@ export class LakeReflection {
     this.target.setSize(Math.max(16, Math.round(width * this.scale)), Math.max(16, Math.round(height * this.scale)));
   }
 
+  disable() {
+    if (this.off) return false;
+    this.off = true;
+    this.u.uReflOn.value = 0;
+    return true;
+  }
+
   render(renderer, scene, camera) {
+    if (this.off) return;
     const cam = camera.position;
     this.frustum.setFromProjectionMatrix(this.tmp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
     const visible = cam.y > WATER_LEVEL + 0.05 && this.frustum.intersectsSphere(this.sphere) &&

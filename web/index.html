@@ -88,6 +88,7 @@
         <p>Settings → World: time of day, date, weather, temperature and wind. The windsock by the runway is fully stretched out at 15 knots (7.7 m/s).</p>
       </div>
     </div>
+    <p class="warn" id="gpu-warning" hidden></p>
     <button type="button" class="btn primary" id="btn-start">Start flying</button>
   </div>
 </section>
@@ -150,8 +151,9 @@
       </div>
       <div>
         <h2>Graphics</h2>
+        <p class="note">Graphics chip in use: <b id="gpu-name">…</b></p>
         <label class="row" for="opt-quality">Quality <select id="opt-quality"></select></label>
-        <p class="note" id="quality-note">Low for phones and old laptops, High for a gaming PC, Ultra for a strong graphics card. If frames get slow, the resolution drops automatically (shown next to the frame rate).</p>
+        <p class="note" id="quality-note">Low for phones and old laptops, High for a gaming PC, Ultra for a strong graphics card. If frames get slow, the game first switches off extras (reflections, glow, some grass, shadow detail) and then lowers the resolution.</p>
         <button type="button" class="btn" id="btn-reload" hidden>Reload now</button>
         <label class="row" for="opt-shadows"><input type="checkbox" id="opt-shadows" checked> Shadows</label>
         <h2>Sound</h2>
