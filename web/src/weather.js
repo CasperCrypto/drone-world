@@ -104,8 +104,8 @@ void main() {
   vec3 vel = normalize(vec3(uWind.x, -speed, uWind.z));
   vec3 toCam = normalize(uCam - p);
   vec3 side = normalize(cross(vel, toCam));
-  float len = mix(0.55, 0.05, uSnow);
-  float width = mix(0.011, 0.05, uSnow);
+  float len = mix(0.8, 0.05, uSnow);
+  float width = mix(0.024, 0.05, uSnow); // drops are smaller, but motion blur makes streaks
   vec3 up = mix(vel * -1.0, normalize(cross(toCam, side)), uSnow);
   vec3 world = p + side * position.x * width + up * (position.y - 0.5) * len;
   vUv = vec2(position.x + 0.5, position.y);
@@ -123,8 +123,8 @@ void main() {
   vec2 c = vUv - 0.5;
   float rain = (1.0 - abs(c.x) * 2.0) * (1.0 - abs(c.y) * 2.0);
   float flake = smoothstep(0.5, 0.15, length(c));
-  float a = mix(rain * 0.35, flake * 0.9, uSnow) * vFade;
-  vec3 col = mix(vec3(0.75, 0.8, 0.85), vec3(1.0), uSnow) * (uLight + uFlash * 4.0);
+  float a = mix(rain * 0.6, flake * 0.9, uSnow) * vFade;
+  vec3 col = mix(vec3(0.85, 0.9, 0.95), vec3(1.0), uSnow) * (uLight * 1.8 + uFlash * 4.0);
   gl_FragColor = vec4(col, a);
 }`,
     });
