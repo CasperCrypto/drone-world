@@ -22,6 +22,6 @@ CC0 (public domain); credit is not required but given gladly. Fetched by
 | metal | [Corrugated Iron 02](https://polyhaven.com/a/corrugated_iron_02) | Jenelle van Heerden, Sergej Majboroda | CC0 |
 | wood | [Wood Planks](https://polyhaven.com/a/wood_planks) | Amal Kumar | CC0 |
 
-Tree bark and leaf textures in `../vendor/ez-tree/assets/` come with
+Tree bark and leaf textures in `trees/` come with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck); its
 bark README credits Poly Haven and TextureCan.
