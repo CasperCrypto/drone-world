@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Drone World</title>
+<meta name="description" content="Open-source drone flight sandbox in the browser: fly a camera drone or an FPV quad over a 1 x 1 km landscape with a keyboard, a gamepad, your RC radio or touch sticks.">
+<link rel="stylesheet" href="src/style.css">
+<script type="importmap">
+{ "imports": {
+  "three": "./vendor/three/three.module.js",
+  "three/addons/": "./vendor/three/addons/"
+} }
+</script>
+</head>
+<body>
+<canvas id="scene" aria-label="3D view of the drone and the landscape"></canvas>
+
+<div class="hud" aria-live="off">
+  <div class="panel tl">
+    <div class="title"><b>Drone World</b> <span id="hud-drone">Camera drone</span> · <span id="hud-mode">Hold</span></div>
+    <dl class="readout">
+      <dt>Speed</dt><dd id="hud-speed">0 km/h</dd>
+      <dt>Height</dt><dd id="hud-agl">0.0 m</dd>
+      <dt>From home</dt><dd id="hud-home">0 m</dd>
+      <dt>Throttle</dt><dd><span class="bar"><i id="hud-thr"></i></span></dd>
+      <dt>Wind</dt><dd id="hud-wind">calm</dd>
+      <dt>Input</dt><dd id="hud-input">keyboard</dd>
+    </dl>
+  </div>
+  <div class="panel tr">
+    <div class="title">Gate course</div>
+    <dl class="readout">
+      <dt>Next gate</dt><dd id="hud-gate">1 / 9</dd>
+      <dt>Lap</dt><dd id="hud-lap">—</dd>
+      <dt>Last</dt><dd id="hud-last">—</dd>
+      <dt>Best</dt><dd id="hud-best">—</dd>
+    </dl>
+  </div>
+  <div class="msg" id="msg" hidden></div>
+  <div class="bottom">
+    <button type="button" class="btn" id="btn-settings">Settings <kbd>Esc</kbd></button>
+    <button type="button" class="btn" id="btn-help">Controls <kbd>H</kbd></button>
+    <span class="hint">M mode · C camera · R reset · P drone · G restart course</span>
+  </div>
+</div>
+
+<div class="touch" id="touch" aria-hidden="true">
+  <div class="stick" data-stick="left"><span></span></div>
+  <div class="stick" data-stick="right"><span></span></div>
+</div>
+
+<section class="sheet" id="help">
+  <div class="sheet-body">
+    <h1>Drone World</h1>
+    <p class="lead">An open-source drone flight sandbox. Fly over a 1 × 1 km practice area with forest, a lake, an airfield and a gate course. The physics is a simplified quadcopter model: the numbers are estimates, not a certified simulator.</p>
+    <div class="cols">
+      <div>
+        <h2>Keyboard</h2>
+        <table>
+          <tr><td><kbd>W</kbd> <kbd>S</kbd></td><td>Throttle (climb / descend)</td></tr>
+          <tr><td><kbd>A</kbd> <kbd>D</kbd></td><td>Yaw (turn left / right)</td></tr>
+          <tr><td><kbd>↑</kbd> <kbd>↓</kbd></td><td>Pitch (forward / back)</td></tr>
+          <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Roll (left / right)</td></tr>
+          <tr><td><kbd>M</kbd></td><td>Flight mode: Hold → Angle → Acro</td></tr>
+          <tr><td><kbd>C</kbd></td><td>Camera: chase → FPV → pilot on the ground</td></tr>
+          <tr><td><kbd>R</kbd></td><td>Back to the take-off pad</td></tr>
+          <tr><td><kbd>P</kbd></td><td>Camera drone ↔ FPV 5-inch</td></tr>
+        </table>
+      </div>
+      <div>
+        <h2>Gamepad and RC radio</h2>
+        <p>Gamepad: left stick throttle and yaw, right stick pitch and roll (mode 2). Y = mode, X = reset, B = camera.</p>
+        <p>RC radio: plug it in by USB and choose <b>USB Joystick (HID)</b> on the radio (EdgeTX / OpenTX). If the sticks are mixed up, open Settings → Radio and use <b>Learn</b>.</p>
+        <h2>Flight modes</h2>
+        <p><b>Hold</b>: release the sticks and the drone stops and hovers. Start here.<br><b>Angle</b>: self-levelling, you control the throttle.<br><b>Acro</b>: the sticks set rotation speed, as FPV pilots fly.</p>
+      </div>
+    </div>
+    <button type="button" class="btn primary" id="btn-start">Start flying</button>
+  </div>
+</section>
+
+<section class="sheet" id="settings" hidden>
+  <div class="sheet-body">
+    <h1>Settings</h1>
+    <div class="cols">
+      <div>
+        <h2>Drone</h2>
+        <div class="seg" role="group" aria-label="Drone type">
+          <button type="button" id="preset-camera" aria-pressed="true">Camera drone</button>
+          <button type="button" id="preset-fpv" aria-pressed="false">FPV 5-inch</button>
+        </div>
+        <p class="note">Both are estimates of typical drones. The builder (next milestone) will compute the physics from real motors, propellers and batteries.</p>
+        <h2>Your own model</h2>
+        <label class="btn file" for="model-file">Upload .glb / .gltf<input type="file" id="model-file" accept=".glb,.gltf,model/gltf-binary,model/gltf+json"></label>
+        <button type="button" class="btn" id="model-rotate">Turn model 90°</button>
+        <button type="button" class="btn" id="model-reset">Default look</button>
+        <p class="note" id="model-info">Changes only the look. The flight physics stays the chosen preset.</p>
+        <h2>Flight mode</h2>
+        <div class="seg" role="group" aria-label="Flight mode">
+          <button type="button" data-mode="Hold" aria-pressed="true">Hold</button>
+          <button type="button" data-mode="Angle" aria-pressed="false">Angle</button>
+          <button type="button" data-mode="Acro" aria-pressed="false">Acro</button>
+        </div>
+        <h2>Wind</h2>
+        <label class="row" for="wind-speed">Speed <output id="wind-speed-out">0 m/s</output></label>
+        <input type="range" id="wind-speed" min="0" max="14" step="0.5" value="0">
+        <label class="row" for="wind-dir">From <output id="wind-dir-out">W</output></label>
+        <input type="range" id="wind-dir" min="0" max="345" step="15" value="270">
+      </div>
+      <div>
+        <h2>Radio (USB joystick)</h2>
+        <p class="note" id="radio-status">No radio connected. Plug it in by USB in joystick mode and move a stick.</p>
+        <table class="radio" id="radio-table">
+          <tr><th>Stick</th><th>Axis</th><th>Invert</th><th>Live</th><th></th></tr>
+        </table>
+        <h2>Graphics</h2>
+        <label class="row" for="opt-shadows"><input type="checkbox" id="opt-shadows" checked> Shadows</label>
+        <label class="row" for="opt-hires"><input type="checkbox" id="opt-hires" checked> Sharp rendering (turn off on slow computers)</label>
+      </div>
+    </div>
+    <button type="button" class="btn primary" id="btn-close">Back to flying</button>
+  </div>
+</section>
+
+<script type="module" src="src/main.js"></script>
+</body>
+</html>

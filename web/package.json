@@ -1,0 +1,12 @@
+{
+  "name": "drone-world-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Drone World browser client: three.js scene, flight model, controls",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test tests/*.test.mjs",
+    "start": "python3 -m http.server 8080"
+  }
+}

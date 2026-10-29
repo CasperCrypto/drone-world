@@ -1,0 +1,10 @@
+node_modules/
+.DS_Store
+*.log
+# Unreal Engine (future client)
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+.vs/
+*.sln
