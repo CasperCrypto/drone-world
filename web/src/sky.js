@@ -118,6 +118,17 @@ export class SkySystem {
     this.lastEnv = { el: 999, az: 999, cover: -1, t: -1 };
   }
 
+  /** Change the shadow map resolution (used when the frame rate is low). */
+  setShadowMapSize(n) {
+    if (this.key.shadow.mapSize.x <= n) return false;
+    this.key.shadow.mapSize.set(n, n);
+    if (this.key.shadow.map) {
+      this.key.shadow.map.dispose();
+      this.key.shadow.map = null;
+    }
+    return true;
+  }
+
   makeSky() {
     const sky = new Sky();
     sky.scale.setScalar(20000);

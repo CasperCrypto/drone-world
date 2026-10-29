@@ -94,6 +94,7 @@ export class Forest {
     this.trees = [];
     this.grid = new Map();
     this.lastBucket = new THREE.Vector3(1e9, 0, 0);
+    this.distanceScale = 1; // lowered when the frame rate is low
     this.dir = new THREE.Vector3();
     this.lastDir = new THREE.Vector3();
   }
@@ -419,8 +420,8 @@ void main() {
     if (!force && !turned && cam.distanceToSquared(this.lastBucket) < 36) return;
     this.lastBucket.copy(cam);
     this.lastDir.copy(this.dir);
-    const nearR = this.quality.treeNear;
-    const midR = this.quality.treeMid;
+    const nearR = this.quality.treeNear * this.distanceScale;
+    const midR = this.quality.treeMid * this.distanceScale;
     const m = new THREE.Matrix4();
     const q = new THREE.Quaternion();
     const s = new THREE.Vector3();
@@ -475,6 +476,14 @@ void main() {
     this.impParams.needsUpdate = true;
     this.impostors.geometry.instanceCount = far;
     this.counts = { near: this.trees.filter((t) => t.lod === 0).length, mid: this.trees.filter((t) => t.lod === 1).length, far };
+  }
+
+  /** Shrink the near and mid detail distances (used when the frame rate is low). */
+  setDistanceScale(f) {
+    if (f >= this.distanceScale) return false;
+    this.distanceScale = f;
+    this.lastBucket.set(1e9, 0, 0); // re-sort on the next frame
+    return true;
   }
 
   // Approximate tree-top height (m) at (x, z), for the wind's canopy shelter.

@@ -3,8 +3,8 @@
 // Does: renders the scene into a high-dynamic-range buffer (with hardware
 // multisampling where the preset asks for it), adds bloom so lamps, the
 // navigation lights, the sun and its glints glow, then tone-maps to the
-// screen (ACES filmic) with the exposure the sky sets. SMAA anti-aliasing is
-// used on the Low preset instead of multisampling.
+// screen (ACES filmic) with the exposure the sky sets, and smooths edges
+// with SMAA (on top of multisampling where the preset has it).
 // Does NOT: depth of field, motion blur or screen-space reflections.
 
 import * as THREE from 'three';
@@ -26,10 +26,10 @@ export class Post {
       this.composer.addPass(this.bloom);
     }
     this.composer.addPass(new OutputPass());
-    if (quality.smaa) {
-      this.smaa = new SMAAPass(size.x, size.y);
-      this.composer.addPass(this.smaa);
-    }
+    // SMAA on every preset: it also smooths what multisampling misses
+    // (leaf cut-outs, grass blades, shading edges).
+    this.smaa = new SMAAPass(size.x, size.y);
+    this.composer.addPass(this.smaa);
   }
 
   setSize(width, height, pixelRatio) {
