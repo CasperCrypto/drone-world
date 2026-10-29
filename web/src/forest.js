@@ -94,6 +94,8 @@ export class Forest {
     this.trees = [];
     this.grid = new Map();
     this.lastBucket = new THREE.Vector3(1e9, 0, 0);
+    this.dir = new THREE.Vector3();
+    this.lastDir = new THREE.Vector3();
   }
 
   /** Builds geometry and materials, plants the trees, bakes impostors. */
@@ -140,6 +142,8 @@ export class Forest {
     const leafMat = new THREE.MeshStandardMaterial({
       map: variant.leafTex,
       alphaTest: 0.42,
+      // With multisampling, soft leaf edges instead of hard, flickering cut-outs.
+      alphaToCoverage: this.quality.msaa > 0,
       side: THREE.DoubleSide,
       roughness: 0.78,
       metalness: 0,
@@ -408,8 +412,13 @@ void main() {
   /** Re-sort trees into near / mid / far when the camera has moved. */
   update(camera, force = false) {
     const cam = camera.position;
-    if (!force && cam.distanceToSquared(this.lastBucket) < 36) return;
+    // Re-sort after moving 6 m or turning 20 degrees (mid trees outside the
+    // view are skipped, so turning must bring them back at once).
+    camera.getWorldDirection(this.dir);
+    const turned = this.dir.dot(this.lastDir) < Math.cos(20 * Math.PI / 180);
+    if (!force && !turned && cam.distanceToSquared(this.lastBucket) < 36) return;
     this.lastBucket.copy(cam);
+    this.lastDir.copy(this.dir);
     const nearR = this.quality.treeNear;
     const midR = this.quality.treeMid;
     const m = new THREE.Matrix4();
@@ -434,7 +443,7 @@ void main() {
       const mid = !near && d < midR + (t.lod === 1 ? 10 : 0);
       if (!near && d > 60) {
         sphere.center.set(t.x, t.y + t.height / 2, t.z);
-        sphere.radius = t.height;
+        sphere.radius = t.height + 25; // margin for turning between re-sorts
         if (!frustum.intersectsSphere(sphere)) { t.lod = -1; continue; }
       }
       if (near || mid) {
