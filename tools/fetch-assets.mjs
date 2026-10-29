@@ -12,7 +12,7 @@
 // Poly Haven assets are CC0 (public domain): https://polyhaven.com/license
 // Usage: node tools/fetch-assets.mjs [resolution]   (default 1k)
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -22,10 +22,11 @@ const RES = process.argv[2] || '1k';
 
 // slot -> candidate Poly Haven asset ids, first one found wins.
 const SLOTS = {
-  grass: ['leafy_grass', 'sparse_grass', 'grass_path_2', 'aerial_grass_rock'],
-  meadow: ['aerial_grass_rock', 'sparse_grass', 'leafy_grass'],
-  forest: ['forrest_ground_01', 'forest_leaves_02', 'brown_mud_leaves_01', 'forest_floor'],
-  rock: ['rocky_terrain_02', 'aerial_rocks_02', 'rock_face', 'rocks_ground_02', 'rocky_terrain'],
+  grass: ['forrest_ground_01', 'leafy_grass', 'sparse_grass'],
+  grassDry: ['leafy_grass', 'sparse_grass', 'dry_grass'],
+  meadow: ['aerial_grass_rock', 'sparse_grass'],
+  forest: ['forest_leaves_02', 'brown_mud_leaves_01', 'forest_floor', 'forest_leaves_04'],
+  rock: ['rock_face', 'cliff_side', 'rock_wall_08', 'rock_boulder_dry', 'rocks_ground_05'],
   sand: ['coast_sand_01', 'aerial_beach_01', 'sand_01', 'coast_sand_rocks_02'],
   dirt: ['brown_mud_02', 'rocky_trail', 'dry_ground_01', 'aerial_ground_rock', 'gravel_floor_02'],
   snow: ['snow_02', 'snow_field_aerial', 'snow_03', 'snow_01'],
@@ -73,6 +74,7 @@ async function fetchAsset(id) {
   };
 }
 
+await rm(OUT, { recursive: true, force: true }); // drop textures no slot uses any more
 const manifest = { resolution: RES, source: 'Poly Haven (CC0)', slots: {} };
 const credits = [];
 for (const [slot, ids] of Object.entries(SLOTS)) {

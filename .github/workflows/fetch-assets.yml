@@ -1,5 +1,5 @@
-# Downloads the CC0 textures listed in tools/fetch-assets.mjs and commits
-# them, so the site never depends on a third-party host at runtime.
+# Downloads the CC0 textures listed in tools/fetch-assets.mjs, converts them
+# to WebP (tools/optimize-textures.py) and commits them, so the site never depends on a third-party host at runtime.
 # Run it by hand from the Actions tab when the texture list changes.
 name: Fetch assets
 
@@ -24,6 +24,13 @@ jobs:
           node-version: 22
       - name: Download textures
         run: node tools/fetch-assets.mjs "${{ inputs.resolution }}"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Convert to WebP
+        run: |
+          pip install --quiet pillow
+          python tools/optimize-textures.py
       - name: Commit
         run: |
           git config user.name "github-actions[bot]"
