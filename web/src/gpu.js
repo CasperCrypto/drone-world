@@ -13,8 +13,11 @@ export function gpuInfo(renderer) {
   const ext = gl.getExtension('WEBGL_debug_renderer_info');
   const raw = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
   // "ANGLE (NVIDIA, NVIDIA GeForce RTX 3060 (0x...) Direct3D11 ...)" -> "NVIDIA GeForce RTX 3060"
-  const m = raw.match(/ANGLE \([^,]*,\s*([^(,]+)/);
-  const name = (m ? m[1] : raw).trim();
+  const m = raw.match(/ANGLE \([^,]*,\s*([^,]+)/);
+  let name = (m ? m[1] : raw).split(/ \(0x| Direct3D| OpenGL| Vulkan| Metal/)[0].trim();
+  if (/swiftshader/i.test(raw)) name = 'SwiftShader';
+  const metal = raw.match(/Renderer:\s*([^,)]+)/); // "ANGLE Metal Renderer: Apple M2"
+  if (metal) name = metal[1].trim();
   let kind = 'unknown';
   if (/swiftshader|llvmpipe|software|basic render|softpipe/i.test(raw)) kind = 'software';
   else if (/nvidia|geforce|rtx|gtx|quadro|radeon\s*(rx|pro)|radeon\(tm\) rx|arc a\d/i.test(raw)) kind = 'dedicated';
