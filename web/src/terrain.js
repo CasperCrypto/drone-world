@@ -36,8 +36,8 @@ const smooth = (e0, e1, x) => {
 
 // Per-layer colour correction (linear RGB multipliers) for the scans.
 const TINTS = [
-  [1.0, 1.04, 0.92], // grass
-  [1.0, 0.98, 0.9], // dry grass
+  [0.8, 1.06, 0.6], // grass: the scan is half brown; push it toward a summer green
+  [0.95, 0.98, 0.72], // dry grass
   [0.95, 0.92, 0.88], // forest floor
   [0.8, 0.8, 0.82], // rock (the scan is reddish; pull it toward grey)
   [1.0, 0.98, 0.94], // sand
@@ -159,7 +159,7 @@ export class Terrain {
     const open = Math.max(0, 1 - rock - sand - forest - dirt);
     const airfield = 1 - smooth(AIRFIELD_RADIUS - 5, AIRFIELD_RADIUS + 30, Math.hypot(x, z));
     const dryNoise = smooth(-0.15, 0.35, this.fbm(x - 90, z + 210, 2, 1 / 110, 1));
-    const dry = open * dryNoise * (1 - airfield) * 0.85;
+    const dry = open * dryNoise * (1 - airfield) * 0.55;
     const grass = open - dry;
     return [grass, dry, forest * 0.85, rock, sand, dirt + forest * 0.15]; // a little mud under trees
   }
@@ -440,8 +440,8 @@ float tAO;
   float porous = w[0] + w[1] + w[2] + w[5] + 0.8 * w[4] + 0.35 * w[3];
   col *= mix(1.0, 0.58, wet * porous);
   float rough = mix(arm.g, 0.42, wet * 0.65);
-  float flat = smoothstep(0.975, 0.997, N.y);
-  float puddle = wet * flat * smoothstep(0.6, 0.7, dwNoise(xz * 0.07) * 0.7 + dwNoise(xz * 0.29) * 0.3) * (w[5] + w[0] * 0.5 + w[1] * 0.5);
+  float flatness = smoothstep(0.975, 0.997, N.y);
+  float puddle = wet * flatness * smoothstep(0.6, 0.7, dwNoise(xz * 0.07) * 0.7 + dwNoise(xz * 0.29) * 0.3) * (w[5] + w[0] * 0.5 + w[1] * 0.5);
   col = mix(col, col * 0.3, puddle);
   rough = mix(rough, 0.04, puddle);
   nrm = mix(nrm, vec3(0.0, 0.0, 1.0), puddle);

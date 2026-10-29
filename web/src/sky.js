@@ -32,6 +32,47 @@ function airMass(elevationDeg) {
   return 1 / (Math.sin(e * RAD) + 0.50572 * Math.pow(e + 6.07995, -1.6364));
 }
 
+// The cloud shader's noise, in JavaScript, so the light can tell whether a
+// visible cloud is in front of the sun. Same formulas as NOISE_GLSL.
+const fract = (x) => x - Math.floor(x);
+function hash12(x, y) {
+  let a = fract(x * 0.1031);
+  let b = fract(y * 0.1031);
+  let c = fract(x * 0.1031);
+  const d = a * (b + 33.33) + b * (c + 33.33) + c * (a + 33.33);
+  a += d; b += d; c += d;
+  return fract((a + b) * c);
+}
+function noise2(x, y) {
+  const ix = Math.floor(x);
+  const iy = Math.floor(y);
+  const fx = x - ix;
+  const fy = y - iy;
+  const ux = fx * fx * (3 - 2 * fx);
+  const uy = fy * fy * (3 - 2 * fy);
+  const a = hash12(ix, iy) + (hash12(ix + 1, iy) - hash12(ix, iy)) * ux;
+  const b = hash12(ix, iy + 1) + (hash12(ix + 1, iy + 1) - hash12(ix, iy + 1)) * ux;
+  return a + (b - a) * uy;
+}
+function fbm2(x, y) {
+  let sum = 0;
+  let amp = 0.5;
+  for (let i = 0; i < 4; i++) {
+    sum += amp * noise2(x, y);
+    x = x * 2.03 + 17.1;
+    y = y * 2.03 + 17.1;
+    amp *= 0.5;
+  }
+  return sum;
+}
+export function cloudDensityAt(px, py, cover) {
+  const n = fbm2(px, py) * 0.75 + noise2(px * 4.1 + 3, py * 4.1 + 3) * 0.25;
+  const e0 = 1 - cover - 0.08;
+  const e1 = 1 - cover + 0.32;
+  const t = Math.min(Math.max((n - e0) / (e1 - e0), 0), 1);
+  return t * t * (3 - 2 * t);
+}
+
 const smooth = (e0, e1, x) => {
   const t = Math.min(Math.max((x - e0) / (e1 - e0), 0), 1);
   return t * t * (3 - 2 * t);
@@ -80,6 +121,15 @@ export class SkySystem {
   makeSky() {
     const sky = new Sky();
     sky.scale.setScalar(20000);
+    // Blend the sky into the fog colour near the horizon, so distant hills
+    // and the sky meet without a seam.
+    const m = sky.material;
+    m.uniforms.uHazeColor = env.uFogColor;
+    m.uniforms.uHaze = { value: 0.5 };
+    m.fragmentShader = m.fragmentShader
+      .replace('void main() {', 'uniform vec3 uHazeColor;\nuniform float uHaze;\nvoid main() {')
+      .replace('gl_FragColor = vec4( retColor, 1.0 );',
+        'retColor = mix(retColor, uHazeColor, uHaze * (1.0 - smoothstep(-0.03, 0.22, direction.y)));\n\t\t\tgl_FragColor = vec4( retColor, 1.0 );');
     return sky;
   }
 
@@ -230,7 +280,16 @@ void main() {
     const m = airMass(sun.elevation);
     const ext = [0.09, 0.17, 0.37]; // per-colour optical depth, tuned (R, G, B)
     const above = smooth(-1.5, 2.5, sun.elevation);
-    const clouds = 1 - 0.82 * smooth(0.25, 0.95, this.cloudCover);
+    // Is a cloud in front of the sun? Same place the cloud shader draws it.
+    let inShade = 1;
+    if (this.sunDir.y > 0.02) {
+      const k = CLOUD_ALTITUDE / 2600 / this.sunDir.y;
+      inShade = cloudDensityAt(this.sunDir.x * k + this.cloudOffset.x, this.sunDir.z * k + this.cloudOffset.y, this.cloudCover);
+    } else {
+      inShade = smooth(0.3, 0.95, this.cloudCover);
+    }
+    this.sunShade = this.sunShade === undefined ? inShade : this.sunShade + (inShade - this.sunShade) * Math.min(1, dt * 1.5);
+    const clouds = 1 - 0.85 * this.sunShade;
     const sunColor = new THREE.Color(Math.exp(-ext[0] * m), Math.exp(-ext[1] * m), Math.exp(-ext[2] * m));
     const sunIntensity = 3.3 * above * clouds;
 
@@ -281,6 +340,7 @@ void main() {
     u.rayleigh.value = THREE.MathUtils.lerp(1.2, 2.6, this.cloudCover);
     u.mieCoefficient.value = 0.005;
     u.mieDirectionalG.value = 0.82;
+    u.uHaze.value = weather.haze;
 
     // Clouds drift with the wind high up (stronger than at the ground).
     const cu = this.clouds.material.uniforms;

@@ -21,14 +21,14 @@ import * as THREE from 'three';
 // sec/seg = sections along / around (per lod), gnarl, tropism (+ up, - down).
 export const SPECIES = {
   spruce: {
-    bark: 'pine', leaf: 'pine', height: 24, trunkRadius: 0.024, trunkSec: [10, 5], trunkSeg: [8, 5], trunkGnarl: 0.015,
+    bark: 'pine', leaf: 'pine', height: 24, trunkRadius: 0.013, trunkSec: [10, 5], trunkSeg: [8, 5], trunkGnarl: 0.015,
     levels: [
       { n: [44, 24], start: 0.1, end: 0.98, angle: [92, 104], len: 0.3, shape: 'cone', rad: 0.32, sec: [4, 2], seg: [4, 3], gnarl: 0.12, tropism: -0.22 },
     ],
     leaves: { onLevel: 1, from: 0.12, perMetre: [2.0, 0.9], size: [1.05, 1.7], style: 'spray', tint: [0.75, 0.85, 0.75] },
   },
   pine: {
-    bark: 'pine', leaf: 'pine', height: 22, trunkRadius: 0.022, trunkSec: [10, 5], trunkSeg: [8, 5], trunkGnarl: 0.05,
+    bark: 'pine', leaf: 'pine', height: 22, trunkRadius: 0.012, trunkSec: [10, 5], trunkSeg: [8, 5], trunkGnarl: 0.05,
     levels: [
       { n: [13, 9], start: 0.56, end: 0.97, angle: [52, 72], len: 0.3, shape: 'umbrella', rad: 0.4, sec: [5, 3], seg: [5, 3], gnarl: 0.25, tropism: 0.12 },
       { n: [5, 0], start: 0.3, end: 0.95, angle: [38, 55], len: 0.45, rad: 0.55, sec: [3, 2], seg: [3, 3], gnarl: 0.3, tropism: 0.18 },
@@ -36,7 +36,7 @@ export const SPECIES = {
     leaves: { onLevel: 2, from: 0.35, perMetre: [1.6, 0.8], size: [1.0, 1.9], style: 'clump', tint: [0.85, 0.95, 0.8] },
   },
   oak: {
-    bark: 'oak', leaf: 'oak', height: 18, trunkRadius: 0.034, trunkLength: 0.42, trunkSec: [8, 4], trunkSeg: [9, 6], trunkGnarl: 0.12,
+    bark: 'oak', leaf: 'oak', height: 18, trunkRadius: 0.026, trunkLength: 0.42, trunkSec: [8, 4], trunkSeg: [9, 6], trunkGnarl: 0.12,
     levels: [
       { n: [6, 6], start: 0.55, end: 1.0, angle: [35, 62], len: 0.55, shape: 'flat', rad: 0.55, sec: [7, 4], seg: [6, 4], gnarl: 0.3, tropism: 0.06 },
       { n: [6, 4], start: 0.25, end: 0.98, angle: [38, 58], len: 0.5, rad: 0.5, sec: [4, 2], seg: [4, 3], gnarl: 0.35, tropism: 0.04 },
@@ -45,7 +45,7 @@ export const SPECIES = {
     leaves: { onLevel: 3, from: 0.15, perMetre: [2.6, 1.1], size: [0.95, 1.8], style: 'spray', tint: [0.9, 0.95, 0.85] },
   },
   birch: {
-    bark: 'birch', leaf: 'ash', height: 17, trunkRadius: 0.013, trunkSec: [10, 5], trunkSeg: [7, 5], trunkGnarl: 0.03,
+    bark: 'birch', leaf: 'ash', height: 17, trunkRadius: 0.0095, trunkSec: [10, 5], trunkSeg: [7, 5], trunkGnarl: 0.03,
     levels: [
       { n: [20, 12], start: 0.33, end: 0.97, angle: [30, 45], len: 0.36, shape: 'taper', rad: 0.42, sec: [5, 3], seg: [4, 3], gnarl: 0.15, tropism: -0.06 },
       { n: [4, 0], start: 0.3, end: 0.95, angle: [35, 50], len: 0.45, rad: 0.55, sec: [3, 2], seg: [3, 3], gnarl: 0.2, tropism: -0.28 },

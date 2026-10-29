@@ -74,6 +74,7 @@ uniform float uSnow;
 varying vec3 vGrassColor;
 varying float vGrassT;
 varying vec3 vGrassWPos;
+varying float vGrassOpen;
 ${WIND_GLSL}
 float dwTerrainH(vec2 xz) {
   vec2 g = clamp((xz + uHalf) / (2.0 * uHalf) * uGridN, vec2(0.0), vec2(uGridN - 0.001));
@@ -119,6 +120,7 @@ vec3 dwTipTint = mix(vec3(1.05, 1.2, 0.75), vec3(1.35, 1.2, 0.85), dwMap.g);
 vGrassColor = dwGround * mix(vec3(0.45), dwTipTint, dwT) * (0.85 + 0.3 * fract(dwR * 11.3));
 vGrassT = dwT;
 vGrassWPos = dwPos;
+vGrassOpen = 1.0 - dwMap.b; // under trees the sun rarely shines through
 `)
         .replace('#include <begin_vertex>', 'vec3 transformed = dwPos;');
       shader.fragmentShader = shader.fragmentShader
@@ -127,13 +129,14 @@ uniform vec3 uSunDir;
 uniform vec3 uSunColor;
 varying vec3 vGrassColor;
 varying float vGrassT;
-varying vec3 vGrassWPos;`)
+varying vec3 vGrassWPos;
+varying float vGrassOpen;`)
         .replace('#include <map_fragment>', 'diffuseColor.rgb = vGrassColor;')
         .replace('#include <emissivemap_fragment>', `
 // Light through the blades when looking toward the sun.
 vec3 dwView = normalize(vGrassWPos - cameraPosition);
 float dwBack = pow(max(dot(dwView, uSunDir), 0.0), 3.0);
-totalEmissiveRadiance += vGrassColor * uSunColor * (0.06 + 0.35 * dwBack) * vGrassT;`);
+totalEmissiveRadiance += vGrassColor * uSunColor * (0.015 + 0.12 * dwBack) * vGrassT * vGrassOpen;`);
     };
     mat.customProgramCacheKey = () => 'dw-grass';
     this.mesh = new THREE.Mesh(geo, mat);

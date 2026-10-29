@@ -378,7 +378,10 @@ void main() {
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 amb = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
   // Same units as three.js lights: irradiance times albedo / pi; trees shade themselves a little.
-  vec3 col = c.rgb / max(c.a, 0.35) * (uSunColor * ndl * 0.75 + amb) * 0.31831;
+  vec3 albedo = c.rgb / max(c.a, 0.35);
+  // Like the leaf material: direct light, sky light, a share of the sky
+  // reflection map, and some light through the leaves.
+  vec3 col = albedo * ((uSunColor * ndl * 0.8 + amb * 1.3) * 0.31831 + uSunColor * 0.045);
   float d = distance(vWPos, cameraPosition);
   float fog = 1.0 - exp(-uFogDensity * uFogDensity * d * d);
   gl_FragColor = vec4(mix(col, uFogColor, fog), 1.0);
