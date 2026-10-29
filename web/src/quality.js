@@ -3,7 +3,7 @@
 // Does: one table of settings per quality level (render resolution,
 // anti-aliasing, bloom, shadow detail, grass and tree detail, texture size,
 // rain particles, lake reflections) and remembers the viewer's choice in this browser.
-// Does NOT: measure the GPU; the default is High on computers and Low on
+// Does NOT: measure the GPU; the default is Medium on computers and Low on
 // touch devices, and the viewer can change it in Settings.
 
 export const QUALITY = {
@@ -22,7 +22,7 @@ export function loadQualityKey() {
   } catch {
     // Storage blocked: use the default.
   }
-  return window.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'high';
+  return window.matchMedia?.('(pointer: coarse)').matches ? 'low' : 'medium';
 }
 
 export function saveQualityKey(key) {

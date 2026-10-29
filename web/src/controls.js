@@ -5,7 +5,7 @@
 // as EdgeTX/OpenTX ones plugged in by USB in joystick mode, which browsers
 // list as generic gamepads), the keyboard and two touch sticks; maps a radio's
 // axes with a saved, user-editable mapping; fires actions (mode, camera,
-// reset, drone type, settings, headlight).
+// reset, drone type, settings, headlight, sound).
 // Does NOT: talk to a radio over anything but USB joystick mode.
 //
 // Output sticks are in [-1, 1]: throttle -1 = down, pitch +1 = forward,
@@ -56,7 +56,7 @@ export class Controls {
   }
 
   keyAction(k) {
-    const map = { m: 'mode', c: 'camera', r: 'reset', p: 'preset', escape: 'settings', g: 'course', h: 'help', l: 'light' };
+    const map = { m: 'mode', c: 'camera', r: 'reset', p: 'preset', escape: 'settings', g: 'course', h: 'help', l: 'light', k: 'mute' };
     if (map[k]) this.fire(map[k]);
   }
 

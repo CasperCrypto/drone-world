@@ -388,9 +388,9 @@ void main() {
   vec3 N = normalize(vRight * n.x + vec3(0.0, 1.0, 0.0) * (ce * n.y + se * n.z) + vToCam * (ce * n.z - se * n.y));
   float ndl = max(dot(N, uSunDir), 0.0);
   vec3 amb = mix(uGroundAmbient, uAmbient, 0.5 + 0.5 * N.y);
-  albedo = mix(albedo, vec3(0.82, 0.85, 0.9), uSnow * 0.75 * smoothstep(0.15, 0.7, N.y));
   // Same units as three.js lights: irradiance times albedo / pi; trees shade themselves a little.
   vec3 albedo = c.rgb / max(c.a, 0.35);
+  albedo = mix(albedo, vec3(0.82, 0.85, 0.9), uSnow * 0.75 * smoothstep(0.15, 0.7, N.y));
   // Like the leaf material: direct light, sky light, a share of the sky
   // reflection map, and some light through the leaves.
   vec3 col = albedo * ((uSunColor * ndl * 0.8 + amb * 1.3) * 0.31831 + uSunColor * 0.045);
