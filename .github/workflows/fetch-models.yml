@@ -1,0 +1,53 @@
+# Lists or downloads CC0 3D models from Poly Haven (tools/fetch-models.mjs)
+# and commits them, so the site never depends on a third-party host at runtime.
+# Run it by hand from the Actions tab: leave "ids" empty to only list the
+# catalogue in the log (optionally filtered by "filter" words).
+name: Fetch models
+
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: Model ids to download, separated by spaces (empty = list only)
+        default: ''
+        required: false
+      filter:
+        description: Words to filter the list by, separated by spaces
+        default: ''
+        required: false
+      resolution:
+        description: Texture resolution (1k or 2k)
+        default: 1k
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: List the catalogue
+        if: ${{ inputs.ids == '' }}
+        env:
+          FILTER: ${{ inputs.filter }}
+        run: node tools/fetch-models.mjs --list $FILTER
+      - name: Download models
+        if: ${{ inputs.ids != '' }}
+        env:
+          IDS: ${{ inputs.ids }}
+          RES: ${{ inputs.resolution }}
+        run: node tools/fetch-models.mjs "$RES" $IDS
+      - name: Commit
+        if: ${{ inputs.ids != '' }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add web/assets
+          if git diff --cached --quiet; then echo "No changes."; exit 0; fi
+          git commit -m "Assets: CC0 models from Poly Haven"
+          git push
