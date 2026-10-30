@@ -36,6 +36,9 @@ jobs:
         env:
           FILTER: ${{ inputs.filter }}
         run: node tools/fetch-models.mjs --list $FILTER
+      - name: Install glTF Transform
+        if: ${{ inputs.ids != '' }}
+        run: npm install -g @gltf-transform/cli@4
       - name: Download models
         if: ${{ inputs.ids != '' }}
         env:
