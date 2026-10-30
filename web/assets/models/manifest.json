@@ -91,28 +91,6 @@
       "bytes": 750612,
       "keptVertices": 0.3
     },
-    "boulder_01": {
-      "id": "boulder_01",
-      "name": "Boulder 01",
-      "authors": [
-        "Rico Cilliers"
-      ],
-      "categories": [
-        "rocks",
-        "nature",
-        "collection: verdant_trail"
-      ],
-      "polycount": 123976,
-      "dimensionsMm": [
-        1272.6830840110779,
-        1830.7338953018188,
-        1003.8918256759644
-      ],
-      "url": "https://polyhaven.com/a/boulder_01",
-      "file": "boulder_01.glb",
-      "bytes": 2089220,
-      "keptVertices": 0.06
-    },
     "tree_stump_01": {
       "id": "tree_stump_01",
       "name": "Tree Stump 01",
@@ -383,8 +361,8 @@
       ],
       "url": "https://polyhaven.com/a/street_lamp_01",
       "file": "street_lamp_01.glb",
-      "bytes": 435768,
-      "keptVertices": 0.5
+      "bytes": 277372,
+      "keptVertices": 0.4
     },
     "concrete_road_barrier_02": {
       "id": "concrete_road_barrier_02",

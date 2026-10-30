@@ -418,6 +418,10 @@ float tAO;
   w[6] = snowW;
   float mixA = smoothstep(0.3, 0.7, dwNoise(xz / 19.0));
   float far = smoothstep(80.0, 400.0, dist);
+  // Screen-space rates of change, taken here where every pixel runs (not
+  // inside the loop, which skips layers per pixel).
+  vec2 dxzX = dFdx(xz);
+  vec2 dxzY = dFdy(xz);
   vec3 col = vec3(0.0);
   vec3 nrm = vec3(0.0);
   vec3 arm = vec3(0.0);
@@ -427,11 +431,21 @@ float tAO;
     float layer = float(i);
     vec2 uv = xz / uGTile[i];
     vec2 uv2 = mat2(0.8, -0.6, 0.6, 0.8) * uv * 0.29 + 0.37;
-    // A positive mip bias reads slightly blurrier texture levels: calmer,
-    // less grainy ground, especially at a distance and at low resolution.
-    vec3 c = mix(texture(uGAlbedo, vec3(uv, layer), 0.8).rgb, texture(uGAlbedo, vec3(uv2, layer), 0.8).rgb, max(mixA * 0.55, far * 0.6));
-    vec3 r = texture(uGArm, vec3(uv, layer), 0.8).rgb;
-    vec3 n = texture(uGNormal, vec3(uv, layer), 1.0).xyz * 2.0 - 1.0;
+    // No visible repeat: every patch of ground a few tiles wide reads the
+    // scan at its own random offset, and neighbouring patches blend
+    // (Quilez, "texture repetition"). Gradients scaled up by 1.74 = a mip
+    // bias of 0.8: calmer, less grainy ground at a distance.
+    vec2 gx = dxzX / uGTile[i] * 1.74;
+    vec2 gy = dxzY / uGTile[i] * 1.74;
+    float nk = dwNoise(uv * 0.31 + layer * 7.13) * 5.0;
+    float ia = floor(nk);
+    float fb = smoothstep(0.25, 0.75, fract(nk));
+    vec2 oa = sin(vec2(3.0, 7.0) * ia) * 2.3;
+    vec2 ob = sin(vec2(3.0, 7.0) * (ia + 1.0)) * 2.3;
+    vec3 c = mix(textureGrad(uGAlbedo, vec3(uv + oa, layer), gx, gy).rgb, textureGrad(uGAlbedo, vec3(uv + ob, layer), gx, gy).rgb, fb);
+    c = mix(c, textureGrad(uGAlbedo, vec3(uv2, layer), gx * 0.29, gy * 0.29).rgb, max(mixA * 0.35, far * 0.5));
+    vec3 r = mix(textureGrad(uGArm, vec3(uv + oa, layer), gx, gy).rgb, textureGrad(uGArm, vec3(uv + ob, layer), gx, gy).rgb, fb);
+    vec3 n = mix(textureGrad(uGNormal, vec3(uv + oa, layer), gx * 1.15, gy * 1.15).xyz, textureGrad(uGNormal, vec3(uv + ob, layer), gx * 1.15, gy * 1.15).xyz, fb) * 2.0 - 1.0;
     float hw = w[i] * pow(0.2 + r.r, 4.0);
     col += c * uGTint[i] * hw;
     nrm += n * hw;

@@ -21,6 +21,7 @@ import { DroneMesh } from './drone-mesh.js';
 import { Controls } from './controls.js';
 import { Post } from './post.js';
 import { ReflectionProbe } from './probe.js';
+import { Props } from './props.js';
 import { Sound } from './audio.js';
 import { gpuInfo, gpuAdvice } from './gpu.js';
 import { QUALITY, loadQualityKey, saveQualityKey, STYLES, loadStyleKey, saveStyleKey } from './quality.js';
@@ -104,6 +105,7 @@ let envr;
 let post;
 let reflection = null;
 let probe = null; // what the drone's paint reflects (Cinematic)
+let props = null; // rocks, logs, barrels and other models (props.js)
 const sound = new Sound();
 let resScale = 1; // automatic resolution scale, lowered when frames get slow
 let perfClock = 0;
@@ -551,6 +553,7 @@ function frame() {
   const light = envr.update(dt, camera, dronePos);
   drone.update(dt, model.state.thrustFraction, light.night);
   forest.update(camera);
+  props?.update(camera);
   grass.update(camera, terrain.heightAt(camera.position.x, camera.position.z));
   updateHud(dt);
   updateRadioPanel();
@@ -602,6 +605,9 @@ async function start() {
   progress(0.82, 'Building the airfield and the farm…');
   await nextFrame();
   world = new World(scene, terrain, textures, forest, styleKey);
+  progress(0.84, 'Placing rocks, logs and props…');
+  props = new Props(scene, terrain, forest, world, quality, styleKey);
+  await props.load((f) => progress(0.84 + f * 0.06, 'Placing rocks, logs and props…'));
   grass = new Grass(terrain, textures, { count: quality.grass, patch: quality.grassPatch }, styleKey);
   grass.mesh.layers.set(1);
   scene.add(grass.mesh);
