@@ -20,7 +20,14 @@ training and experimentation sandbox, not a certified simulator.
   and a 9-gate course with lap times.
 - Ground from scanned (CC0) textures: grass, dry grass, forest floor, rock,
   sand, mud, snow, asphalt, concrete, plaster, brick, roof tiles, corrugated
-  metal, wood. Real-world texture scale from the scans' own metadata.
+  metal, wood. Real-world texture scale from the scans' own metadata. Each
+  patch of a few tiles reads the scan at its own random offset and
+  neighbouring patches blend, so large areas show no repeating pattern.
+- Scanned 3D models (CC0, Poly Haven), simplified for the browser: rock
+  faces on steep slopes, mossy rocks, stumps, fallen logs, dry branches and
+  ferns in the forest, barrels, a generator, lamps and barriers at the
+  airfield, a covered car at the farm. Drawn in chunks, small things only
+  near the camera; how many depends on the quality preset.
 - About 10,000 trees grown by our own generator (Scots pine, Norway spruce,
   oak, birch) with scanned bark and leaf textures, drawn at three levels of
   detail: full trees near you, simpler ones further away, and baked
@@ -154,6 +161,8 @@ each stick.
 | `web/src/controls.js` | Keyboard, Gamepad API (gamepads and RC radios), touch sticks. |
 | `web/src/drone-mesh.js` | The drones' look, lights and headlight; loading your own model. |
 | `web/src/main.js` | Loading, cameras, HUD, settings, the main loop. |
+| `web/src/props.js` | Places the scanned 3D models, chunked instancing, view distances, collision boxes. |
+| `tools/fetch-models.mjs` | Lists or downloads Poly Haven models and simplifies them with glTF Transform (run by the "Fetch models" workflow). |
 | `tools/fetch-assets.mjs`, `tools/optimize-textures.py` | Download the CC0 textures from Poly Haven and convert them to WebP (run by the "Fetch assets" workflow). Credits in `web/assets/CREDITS.md`. |
 
 Tests:

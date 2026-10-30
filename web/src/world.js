@@ -64,9 +64,10 @@ function weatherproof(material, porosity = 0.6) {
 diffuseColor.rgb *= mix(1.0, 0.6, uWetness * ${porosity.toFixed(2)});
 float dwSnowHere = uSnow * smoothstep(0.55, 0.9, vUpW.y);
 diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.85, 0.87, 0.9), dwSnowHere);`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-roughnessFactor = mix(roughnessFactor, 0.12, uWetness * 0.85 * (1.0 - dwSnowHere));
-roughnessFactor = mix(roughnessFactor, 0.8, dwSnowHere);`);
+      // After the roughness and metalness maps (which textures.js may rewrite), before the normals.
+      .replace('#include <normal_fragment_begin>', `roughnessFactor = mix(roughnessFactor, 0.12, uWetness * 0.85 * (1.0 - dwSnowHere));
+roughnessFactor = mix(roughnessFactor, 0.8, dwSnowHere);
+#include <normal_fragment_begin>`);
   };
   const key = material.customProgramCacheKey.bind(material);
   material.customProgramCacheKey = () => `${key()}|wet${porosity}`;

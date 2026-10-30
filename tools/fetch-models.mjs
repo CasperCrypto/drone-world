@@ -27,10 +27,12 @@ const CREDITS = join(ROOT, 'web', 'assets', 'CREDITS.md');
 const HEADERS = { 'User-Agent': 'drone-world-fetch-models (github.com/CasperCrypto/drone-world)' };
 // Share of vertices to keep when simplifying (scanned models are dense); 1 = keep all.
 const KEEP = {
-  rock_moss_set_01: 0.12, rock_moss_set_02: 0.12, rock_face_01: 0.35, rock_face_02: 0.3, boulder_01: 0.06,
+  rock_moss_set_01: 0.12, rock_moss_set_02: 0.12, rock_face_01: 0.35, rock_face_02: 0.3,
   tree_stump_01: 0.15, tree_stump_02: 0.12, dead_tree_trunk: 0.08, dry_branches_medium_01: 0.4,
-  portable_generator: 0.5, street_lamp_01: 0.5, concrete_road_barrier_02: 0.2, metal_trash_can: 0.5,
+  portable_generator: 0.5, street_lamp_01: 0.4, concrete_road_barrier_02: 0.2, metal_trash_can: 0.5,
 };
+// Allowed shape error when simplifying, as a share of the model's size (default 0.004).
+const ERROR = { street_lamp_01: 0.01 };
 
 async function json(url) {
   const r = await fetch(url, { headers: HEADERS });
@@ -78,7 +80,7 @@ async function fetchModel(id, res) {
     '--texture-size', '1024',
     '--simplify', keep < 1 ? 'true' : 'false',
     '--simplify-ratio', String(keep),
-    '--simplify-error', '0.004',
+    '--simplify-error', String(ERROR[id] ?? 0.004),
     '--palette', 'false',
     '--instance', 'false',
   ], { stdio: 'inherit' });

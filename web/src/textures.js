@@ -4,14 +4,55 @@
 // (grass, dry grass, forest floor, rock, sand, mud, snow, meadow) into three
 // texture arrays (colour, normal, ARM = occlusion/roughness/metalness) so the
 // terrain shader can blend them in one draw, and builds ready-to-use PBR
-// materials for runway, buildings and props. Reports progress for the
-// loading screen.
+// materials for runway, buildings and props, whose textures are read at a
+// random offset per patch so long surfaces show no repeating pattern.
+// Reports progress for the loading screen.
 // Does NOT: download anything at runtime from third parties; every file is in
 // this repository (fetched once by tools/fetch-assets.mjs).
 
 import * as THREE from 'three';
 
 export const GROUND_LAYERS = ['grass', 'grassDry', 'forest', 'rock', 'sand', 'dirt', 'snow', 'meadow'];
+
+// Texture reads without a visible repeat: each patch of a few tiles uses its
+// own random offset and neighbouring patches blend (Quilez, "texture
+// repetition"). Every map of the material uses the same offsets, so colour,
+// normals and roughness stay together.
+const NO_TILE_GLSL = /* glsl */ `
+float dwNtHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float dwNtNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(dwNtHash(i), dwNtHash(i + vec2(1.0, 0.0)), u.x), mix(dwNtHash(i + vec2(0.0, 1.0)), dwNtHash(i + vec2(1.0, 1.0)), u.x), u.y);
+}
+vec4 dwNoTile(sampler2D s, vec2 uv) {
+  float k = dwNtNoise(uv * 0.31) * 5.0;
+  float i = floor(k);
+  float f = smoothstep(0.25, 0.75, fract(k));
+  vec2 gx = dFdx(uv);
+  vec2 gy = dFdy(uv);
+  return mix(textureGrad(s, uv + sin(vec2(3.0, 7.0) * i) * 2.3, gx, gy), textureGrad(s, uv + sin(vec2(3.0, 7.0) * (i + 1.0)) * 2.3, gx, gy), f);
+}`;
+
+function noTile(material) {
+  const swap = (chunk, from, to) => THREE.ShaderChunk[chunk].split(from).join(to);
+  material.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${NO_TILE_GLSL}`)
+      .replace('#include <map_fragment>', swap('map_fragment', 'texture2D( map, vMapUv )', 'dwNoTile( map, vMapUv )'))
+      .replace('#include <normal_fragment_maps>', swap('normal_fragment_maps', 'texture2D( normalMap, vNormalMapUv )', 'dwNoTile( normalMap, vNormalMapUv )'))
+      .replace('#include <roughnessmap_fragment>', swap('roughnessmap_fragment', 'texture2D( roughnessMap, vRoughnessMapUv )', 'dwNoTile( roughnessMap, vRoughnessMapUv )'))
+      .replace('#include <metalnessmap_fragment>', swap('metalnessmap_fragment', 'texture2D( metalnessMap, vMetalnessMapUv )', 'dwNoTile( metalnessMap, vMetalnessMapUv )'))
+      .replace('#include <aomap_fragment>', swap('aomap_fragment', 'texture2D( aoMap, vAoMapUv )', 'dwNoTile( aoMap, vAoMapUv )'));
+  };
+  material.customProgramCacheKey = () => 'dw-notile';
+  return material;
+}
 const BASE = new URL('../assets/textures/', import.meta.url);
 
 async function loadBitmap(url) {
@@ -109,7 +150,7 @@ export class TextureLibrary {
     const tileM = (this.manifest.slots[slot].dimensionsMm?.[0] ?? 2000) / 1000;
     const rep = 1 / tileM;
     const arm = this.tex(slot, 'arm', [rep, rep]);
-    return new THREE.MeshStandardMaterial({
+    return noTile(new THREE.MeshStandardMaterial({
       map: this.tex(slot, 'diff', [rep, rep]),
       normalMap: this.tex(slot, 'nor_gl', [rep, rep]),
       aoMap: arm,
@@ -118,7 +159,7 @@ export class TextureLibrary {
       roughness: 1,
       metalness: 1, // scaled by the ARM map's blue channel
       ...opts,
-    });
+    }));
   }
 
   treeTexture(path, srgb) {

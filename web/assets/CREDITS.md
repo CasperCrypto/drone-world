@@ -39,7 +39,6 @@ CC0 (public domain); credit is not required but given gladly. Fetched by
 | [Rock Moss Set 02](https://polyhaven.com/a/rock_moss_set_02) | Kless Gyzen | CC0 |
 | [Rock Face 01](https://polyhaven.com/a/rock_face_01) | Dario Barresi | CC0 |
 | [Rock Face 02](https://polyhaven.com/a/rock_face_02) | Dario Barresi, Rico Cilliers | CC0 |
-| [Boulder 01](https://polyhaven.com/a/boulder_01) | Rico Cilliers | CC0 |
 | [Tree Stump 01](https://polyhaven.com/a/tree_stump_01) | Rob Tuytel | CC0 |
 | [Tree Stump 02](https://polyhaven.com/a/tree_stump_02) | Rob Tuytel | CC0 |
 | [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk) | Rob Tuytel | CC0 |
