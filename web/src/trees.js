@@ -10,6 +10,10 @@
 // volume rather than a pile of flat cards.
 // Does NOT: draw anything or place trees (forest.js does).
 //
+// Two looks: 'realistic' (leaf and needle cards with scanned textures) and
+// 'stylized' (smooth leaf clumps, stacked cones for spruce, shaded by a
+// vertex gradient; no textures, no cut-outs, far fewer triangles).
+//
 // Units are metres; +y up; the trunk base is at the origin.
 
 import * as THREE from 'three';
@@ -54,6 +58,14 @@ export const SPECIES = {
   },
 };
 
+// Stylized foliage: which branch level carries clumps (per lod), clump
+// radius range (m), vertical squash, clumps per branch (per lod).
+const PUFFS = {
+  pine: { level: [1, 1], size: [1.9, 2.7], squash: 0.62, perBranch: [2, 1] },
+  oak: { level: [2, 1], size: [1.7, 2.5], squash: 0.85, perBranch: [1, 3] },
+  birch: { level: [1, 1], size: [1.15, 1.6], squash: 1.3, perBranch: [2, 1] },
+};
+
 function rng(seed) {
   let s = (seed >>> 0) || 1;
   return () => {
@@ -81,6 +93,7 @@ class Arrays {
     this.nor = [];
     this.uv = [];
     this.wind = [];
+    this.col = [];
     this.idx = [];
   }
   geometry() {
@@ -89,6 +102,7 @@ class Arrays {
     g.setAttribute('normal', new THREE.Float32BufferAttribute(this.nor, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(this.uv, 2));
     g.setAttribute('aWind', new THREE.Float32BufferAttribute(this.wind, 3));
+    if (this.col.length) g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3));
     g.setIndex(this.idx);
     g.computeBoundingSphere();
     return g;
@@ -97,7 +111,9 @@ class Arrays {
 
 const UP = new THREE.Vector3(0, 1, 0);
 
-export function buildTree(speciesKey, seed, lod = 0) {
+export function buildTree(speciesKey, seed, lod = 0, style = 'realistic') {
+  const stylized = style !== 'realistic';
+  const anchors = []; // where stylized clumps go
   const sp = SPECIES[speciesKey];
   const H = sp.height;
   const bark = new Arrays();
@@ -148,7 +164,16 @@ export function buildTree(speciesKey, seed, lod = 0) {
         grow(at.p, childDir, len, rad, level + 1, id * 131 + c + 7, child);
       }
     }
-    if (level === leafCfg.onLevel || (lod === 1 && level === leafCfg.onLevel - 1 && !(sp.levels[level] && sp.levels[level].n[1] > 0))) {
+    if (stylized) {
+      const pf = PUFFS[speciesKey];
+      if (pf && level === pf.level[lod]) {
+        const k = pf.perBranch[lod];
+        for (let i = 0; i < k; i++) {
+          const at = sample(nodes, k === 1 ? 0.92 : 0.45 + 0.5 * (i / (k - 1)));
+          anchors.push({ p: at.p, phase: rand(), size: 0.85 + rand() * 0.3 });
+        }
+      }
+    } else if (level === leafCfg.onLevel || (lod === 1 && level === leafCfg.onLevel - 1 && !(sp.levels[level] && sp.levels[level].n[1] > 0))) {
       addLeaves(nodes, length, rand);
     }
   }
@@ -227,8 +252,92 @@ export function buildTree(speciesKey, seed, lod = 0) {
     }
   }
 
+  // Stylized: one smooth clump (a noisy, squashed sphere) per anchor.
+  function puff(center, radius, squash, phase, seedN) {
+    const geo = new THREE.IcosahedronGeometry(1, 1); // 80 triangles
+    const pos = geo.attributes.position;
+    const prand = rng(seedN);
+    const bumps = Array.from({ length: 5 }, () => new THREE.Vector3(prand() * 2 - 1, prand() * 2 - 1, prand() * 2 - 1).normalize());
+    const v = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      let bump = 0;
+      for (const b of bumps) bump += Math.max(0, v.dot(b)) ** 3;
+      v.multiplyScalar(radius * (0.88 + 0.22 * bump));
+      v.y *= squash;
+      pos.setXYZ(i, v.x, v.y, v.z);
+    }
+    const base = leaves.pos.length / 3;
+    const n = new THREE.Vector3();
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      // Smooth normal of the squashed sphere: (x, y / squash^2, z).
+      n.set(v.x, v.y / (squash * squash), v.z).normalize();
+      v.add(center);
+      // Mostly its own shape, partly the whole crown: reads as one volume.
+      const radial = v.clone().sub(crownCenter);
+      radial.y *= 0.6;
+      n.multiplyScalar(0.6).addScaledVector(radial.normalize(), 0.4).normalize();
+      leaves.pos.push(v.x, v.y, v.z);
+      leaves.nor.push(n.x, n.y, n.z);
+      leaves.uv.push(0, 0);
+      leaves.wind.push(v.y / H, 0.45, phase);
+      // Lighter on top and outside, darker underneath and inside the crown.
+      const g = 0.5 + 0.35 * (n.y * 0.5 + 0.5) + 0.15 * Math.min(1, v.y / H);
+      leaves.col.push(g, g, g);
+    }
+    for (let i = 0; i < pos.count; i += 3) leaves.idx.push(base + i, base + i + 1, base + i + 2);
+    geo.dispose();
+  }
+
+  // Stylized spruce: stacked cones, wider at the bottom, like a fir.
+  function cones() {
+    const layers = lod === 0 ? 7 : 5;
+    const bottom = H * 0.14;
+    const crownR = H * sp.levels[0].len * 0.95;
+    const crand = rng(seed * 7 + 3);
+    for (let i = 0; i < layers; i++) {
+      const t = i / layers;
+      const y = bottom + (H - bottom) * t;
+      const r = crownR * Math.pow(1 - t, 0.9) + 0.4;
+      const h = ((H - bottom) / layers) * 2.1;
+      const geo = new THREE.ConeGeometry(r, h, lod === 0 ? 16 : 10, 2, false);
+      geo.rotateY(crand() * Math.PI);
+      geo.translate((crand() - 0.5) * 0.3, y + h / 2, (crand() - 0.5) * 0.3);
+      // Keep the cone's own smooth normals and index.
+      const pos = geo.attributes.position;
+      const nor = geo.attributes.normal;
+      const base = leaves.pos.length / 3;
+      const v = new THREE.Vector3();
+      const n = new THREE.Vector3();
+      for (let k = 0; k < pos.count; k++) {
+        v.fromBufferAttribute(pos, k);
+        n.fromBufferAttribute(nor, k);
+        leaves.pos.push(v.x, v.y, v.z);
+        leaves.nor.push(n.x, n.y, n.z);
+        leaves.uv.push(0, 0);
+        leaves.wind.push(v.y / H, 0.25, t);
+        const g = n.y < -0.5 ? 0.35 : 0.55 + 0.3 * Math.min(1, (v.y - y) / h + 0.3) + 0.15 * t;
+        leaves.col.push(g, g, g);
+      }
+      const index = geo.index.array;
+      for (let k = 0; k < index.length; k++) leaves.idx.push(base + index[k]);
+      geo.dispose();
+    }
+  }
+
   const trunkLen = H * (sp.trunkLength ?? 1);
   grow(new THREE.Vector3(0, -0.4, 0), UP.clone(), trunkLen + 0.4, H * sp.trunkRadius, 0, 1, null);
+  if (stylized) {
+    if (speciesKey === 'spruce') cones();
+    const pf = PUFFS[speciesKey];
+    if (pf) {
+      anchors.forEach((a, i) => {
+        const size = (pf.size[0] + (pf.size[1] - pf.size[0]) * ((i * 0.618) % 1)) * a.size * (lod === 1 ? 1.25 : 1);
+        puff(a.p, size, pf.squash, a.phase, seed * 31 + i);
+      });
+    }
+  }
 
   const barkGeo = bark.geometry();
   const leafGeo = leaves.geometry();

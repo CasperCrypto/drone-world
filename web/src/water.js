@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { LAKE, WATER_LEVEL, HALF } from './layout.js';
 import { GRID } from './terrain.js';
 import { env, NOISE_GLSL, linkEnv } from './shaders.js';
+import { palette } from './palette.js';
 
 // A tiling normal map of small waves, drawn once on a canvas.
 function waveNormals(size = 256) {
@@ -49,11 +50,12 @@ function waveNormals(size = 256) {
   return tex;
 }
 
-export function makeLake(terrain) {
+export function makeLake(terrain, style = 'toon') {
+  const pal = palette(style);
   const geo = new THREE.CircleGeometry(LAKE.r * 1.2, 96);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshPhysicalMaterial({
-    color: 0x0b2a2e,
+    color: pal ? pal.water : 0x0b2a2e,
     roughness: 0.06,
     metalness: 0,
     ior: 1.333,
@@ -68,6 +70,7 @@ export function makeLake(terrain) {
     uReflection: { value: null },
     uReflMatrix: { value: new THREE.Matrix4() },
     uReflOn: { value: 0 },
+    uShallow: { value: new THREE.Vector3(...(pal ? pal.shallow : [0.06, 0.09, 0.05])) },
   };
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, uniforms);
@@ -88,6 +91,7 @@ uniform float uRain;
 uniform sampler2D uReflection;
 uniform mat4 uReflMatrix;
 uniform float uReflOn;
+uniform vec3 uShallow;
 varying vec3 vWaterPos;
 float dwDepth;
 ${NOISE_GLSL}
@@ -141,7 +145,7 @@ if (uReflOn > 0.5) {
       .replace('#include <color_fragment>', `#include <color_fragment>
 dwDepth = max(uLevel - dwBed(vWaterPos.xz), 0.0);
 // Shallow water shows the bottom; deeper water turns dark green-blue.
-diffuseColor.rgb = mix(vec3(0.06, 0.09, 0.05), diffuseColor.rgb, smoothstep(0.0, 3.5, dwDepth));
+diffuseColor.rgb = mix(uShallow, diffuseColor.rgb, smoothstep(0.0, 3.5, dwDepth));
 diffuseColor.a = smoothstep(0.0, 0.35, dwDepth) * mix(0.55, 0.96, smoothstep(0.3, 4.0, dwDepth));`);
   };
   mat.customProgramCacheKey = () => 'dw-water';

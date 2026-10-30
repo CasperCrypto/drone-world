@@ -22,6 +22,7 @@ import {
   trackDistance, onHardSurface,
 } from './layout.js';
 import { env, NOISE_GLSL, linkEnv } from './shaders.js';
+import { palette, TOON } from './palette.js';
 
 export { WORLD_SIZE, WATER_LEVEL, AIRFIELD_RADIUS, LAKE };
 export const GRID = 512; // cells per side, 2 m each
@@ -187,7 +188,7 @@ export class Terrain {
     return 1 - 0.85 * (occ / dirs);
   }
 
-  buildMesh(textures) {
+  buildMesh(textures, style = 'toon') {
     const row = GRID + 1;
     // One extra ring of "skirt" vertices hangs down at the edge so no gap
     // shows against the far landscape.
@@ -252,7 +253,7 @@ export class Terrain {
     geo.setAttribute('aSplat1', new THREE.BufferAttribute(splat1.subarray(0, s * 4), 4));
     geo.setIndex(index);
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, terrainMaterial(textures));
+    const mesh = new THREE.Mesh(geo, terrainMaterial(textures, false, style));
     mesh.receiveShadow = true;
     mesh.castShadow = true;
     mesh.name = 'terrain';
@@ -304,7 +305,7 @@ export class Terrain {
   }
 
   // The land beyond the free area, out to 4 km: coarse, with a canopy over forests.
-  buildFarMesh(textures) {
+  buildFarMesh(textures, style = 'toon') {
     const row = FAR_GRID + 1;
     const cell = FAR_SIZE / FAR_GRID;
     const positions = new Float32Array(row * row * 3);
@@ -339,7 +340,7 @@ export class Terrain {
     geo.setAttribute('aSplat1', new THREE.BufferAttribute(splat1, 4));
     geo.setIndex(index);
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, terrainMaterial(textures, true));
+    const mesh = new THREE.Mesh(geo, terrainMaterial(textures, true, style));
     mesh.receiveShadow = false;
     mesh.name = 'far-terrain';
     return mesh;
@@ -348,7 +349,9 @@ export class Terrain {
 
 // The ground shader: MeshStandardMaterial with the colour, normal,
 // roughness and occlusion replaced by a blend of the scanned layers.
-function terrainMaterial(textures, far = false) {
+function terrainMaterial(textures, far = false, style = 'toon') {
+  const pal = palette(style);
+  const P = pal || TOON; // uniforms are declared either way
   const g = textures.ground;
   const mat = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0 });
   mat.onBeforeCompile = (shader) => {
@@ -358,7 +361,17 @@ function terrainMaterial(textures, far = false) {
     shader.uniforms.uGArm = { value: g.arm };
     shader.uniforms.uGTile = { value: g.tile };
     shader.uniforms.uGTint = { value: TINTS.map((t) => new THREE.Vector3(...t)) };
-    shader.defines = { ...(shader.defines || {}), ...(far ? { DW_FAR: '' } : {}) };
+    shader.defines = {
+      ...(shader.defines || {}),
+      ...(far ? { DW_FAR: '' } : {}),
+      ...(pal ? { DW_PAL: '' } : {}),
+      ...(pal?.contours ? { DW_CONTOURS: '' } : {}),
+      ...(pal?.toon ? { DW_TOON: '' } : {}),
+    };
+    const v3 = (a) => new THREE.Vector3(...a);
+    const pg = P.ground;
+    shader.uniforms.uPal = { value: [pg.grass, pg.dry, pg.forest, pg.rock, pg.sand, pg.dirt, pg.snow].map(v3) };
+    shader.uniforms.uCanopy = { value: P.canopy.map(v3) };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', `#include <common>
 attribute vec4 aSplat0;
@@ -379,6 +392,8 @@ uniform sampler2DArray uGNormal;
 uniform sampler2DArray uGArm;
 uniform float uGTile[8];
 uniform vec3 uGTint[8];
+uniform vec3 uPal[7];
+uniform vec3 uCanopy[2];
 uniform float uWetness;
 uniform float uSnow;
 uniform float uTime;
@@ -433,10 +448,42 @@ float tAO;
   float m2 = dot(texture(uGAlbedo, vec3(xz / 47.0 + 0.5, 7.0)).rgb, vec3(0.3, 0.59, 0.11));
   float grassy = (w[0] + w[1]) / (w[0] + w[1] + w[2] + w[3] + w[4] + w[5] + w[6] + 1e-4);
   col *= mix(1.0, 0.62 + 0.85 * (m1 * 0.6 + m2 * 0.4), 0.4 * grassy);
+#ifdef DW_PAL
+  // Stylized and dark studio: each material is one designed colour; the
+  // scan only adds a faint hint of texture, and the surface stays smooth.
+  {
+    vec3 pal = vec3(0.0);
+    float ws = 1e-4;
+    for (int i = 0; i < 7; i++) { pal += uPal[i] * w[i]; ws += w[i]; }
+    pal /= ws;
+    float hint = clamp(dot(col, vec3(0.333)) / 0.22, 0.7, 1.3);
+    col = pal * (${(1 - P.groundVariation / 2).toFixed(3)} + ${P.groundVariation.toFixed(3)} * dwFbm(xz / 70.0)) * mix(1.0, hint, 0.22);
+#ifdef DW_TOON
+    // Painted look: warm sunny patches and cooler hollows.
+    col *= mix(vec3(0.9, 0.97, 1.1), vec3(1.1, 1.04, 0.84), dwFbm(xz / 33.0 + 7.0));
+#endif
+    nrm = mix(nrm, vec3(0.0, 0.0, 1.0), 0.85);
+#if defined(DW_CONTOURS) && !defined(DW_FAR)
+    // Height lines every few metres and a coarse grid: help to judge height and distance.
+    float fade = 1.0 - smoothstep(120.0, 420.0, dist);
+    float hc = vWPos.y / ${P.contour.toFixed(1)};
+    float dc = abs(fract(hc + 0.5) - 0.5) / max(fwidth(hc), 1e-4);
+    float contour = 1.0 - smoothstep(0.0, 1.2, dc);
+    vec2 gq = xz / ${P.grid.toFixed(1)};
+    vec2 dg = abs(fract(gq + 0.5) - 0.5) / max(fwidth(gq), vec2(1e-4));
+    float grid = 1.0 - smoothstep(0.0, 1.0, min(dg.x, dg.y));
+    col += (contour * 0.035 + grid * 0.02) * fade;
+#endif
+  }
+#endif
 #ifdef DW_FAR
   // Distant forests: a canopy of mottled dark greens on the raised mesh.
   float canopy = vSplat1.w;
+#ifdef DW_PAL
+  vec3 leaves = mix(uCanopy[0], uCanopy[1], dwFbm(xz / 35.0));
+#else
   vec3 leaves = mix(vec3(0.028, 0.045, 0.02), vec3(0.06, 0.08, 0.035), dwFbm(xz / 35.0));
+#endif
   col = mix(col, leaves, canopy);
   arm.g = mix(arm.g, 0.85, canopy);
 #endif
@@ -464,6 +511,6 @@ float tAO;
 reflectedLight.indirectDiffuse *= tAO;
 reflectedLight.indirectSpecular *= tAO;`);
   };
-  mat.customProgramCacheKey = () => (far ? 'dw-terrain-far' : 'dw-terrain');
+  mat.customProgramCacheKey = () => `dw-terrain${far ? '-far' : ''}-${pal ? pal.key : 'scan'}`;
   return mat;
 }

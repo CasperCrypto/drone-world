@@ -14,6 +14,7 @@ import * as THREE from 'three';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { sunPosition, moonPosition, POLAND } from './solar.js';
 import { env, NOISE_GLSL } from './shaders.js';
+import { palette } from './palette.js';
 
 const RAD = Math.PI / 180;
 const DOME = 8500;
@@ -79,9 +80,11 @@ const smooth = (e0, e1, x) => {
 };
 
 export class SkySystem {
-  constructor(renderer, scene) {
+  constructor(renderer, scene, style = 'toon') {
     this.renderer = renderer;
     this.scene = scene;
+    this.pal = palette(style);
+    this.stylized = !!this.pal;
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.moonDir = new THREE.Vector3(0, -1, 0);
     this.cloudCover = 0.1;
@@ -91,6 +94,12 @@ export class SkySystem {
 
     this.sky = this.makeSky();
     scene.add(this.sky);
+    // Stylized and dark studio: a designed gradient instead of the physical sky.
+    this.studio = this.makeStudioSky();
+    this.sky.visible = !this.stylized;
+    this.studio.visible = this.stylized;
+    scene.add(this.studio);
+    this.horizonColor = new THREE.Color();
 
     this.clouds = this.makeClouds();
     scene.add(this.clouds);
@@ -109,8 +118,8 @@ export class SkySystem {
 
     // Reflection map: the sky (with clouds) rendered into a cube and pre-filtered.
     this.envScene = new THREE.Scene();
-    this.envSky = new THREE.Mesh(this.sky.geometry, this.sky.material);
-    this.envSky.scale.setScalar(1000);
+    this.envSky = this.stylized ? new THREE.Mesh(this.studio.geometry, this.studio.material) : new THREE.Mesh(this.sky.geometry, this.sky.material);
+    this.envSky.scale.setScalar(this.stylized ? 1000 / DOME : 1000);
     this.envClouds = new THREE.Mesh(this.clouds.geometry, this.clouds.material);
     this.envClouds.scale.setScalar(900 / DOME);
     this.envScene.add(this.envSky, this.envClouds);
@@ -142,6 +151,49 @@ export class SkySystem {
       .replace('gl_FragColor = vec4( retColor, 1.0 );',
         'retColor = mix(retColor, uHazeColor, uHaze * (1.0 - smoothstep(-0.03, 0.22, direction.y)));\n\t\t\tgl_FragColor = vec4( retColor, 1.0 );');
     return sky;
+  }
+
+  makeStudioSky() {
+    const mat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      depthWrite: false,
+      uniforms: {
+        uZenith: { value: new THREE.Color() },
+        uHorizon: { value: new THREE.Color() },
+        uSunDir: env.uSunDir,
+        uSunTint: { value: new THREE.Color() },
+        uSunGlow: { value: 1 },
+        uRealSun: { value: new THREE.Vector3(0, 1, 0) },
+      },
+      vertexShader: /* glsl */ `
+varying vec3 vDir;
+void main() {
+  vDir = normalize((modelMatrix * vec4(position, 1.0)).xyz - cameraPosition);
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  gl_Position.z = gl_Position.w * 0.999995;
+}`,
+      fragmentShader: /* glsl */ `
+uniform vec3 uZenith;
+uniform vec3 uHorizon;
+uniform vec3 uSunTint;
+uniform float uSunGlow;
+uniform vec3 uRealSun;
+varying vec3 vDir;
+void main() {
+  vec3 d = normalize(vDir);
+  float h = clamp(d.y, -0.2, 1.0);
+  vec3 col = mix(uHorizon, uZenith, pow(smoothstep(-0.04, 0.65, h), 0.75));
+  col *= mix(0.55, 1.0, smoothstep(-0.2, 0.0, d.y));
+  float s = max(dot(d, normalize(uRealSun)), 0.0);
+  col += uSunTint * (pow(s, 900.0) * 24.0 + pow(s, 14.0) * 0.18 + pow(s, 3.0) * 0.04) * uSunGlow;
+  gl_FragColor = vec4(col, 1.0);
+}`,
+    });
+    const mesh = new THREE.Mesh(new THREE.SphereGeometry(DOME * 1.05, 48, 24), mat);
+    mesh.frustumCulled = false;
+    mesh.renderOrder = -3;
+    mesh.name = 'studio-sky';
+    return mesh;
   }
 
   makeClouds() {
@@ -336,6 +388,37 @@ void main() {
 
     // Exposure: like eyes adapting, so night is dark but readable.
     this.exposure = THREE.MathUtils.lerp(2.6, 0.82, smooth(-12, 8, sun.elevation)) * (1 + 0.6 * this.cloudCover * day);
+
+    if (this.stylized) {
+      // Designed light: the palette's sun colour, sky and ground light, and
+      // a gradient sky; warmth at dusk.
+      const k = this.pal.sky;
+      const v = (a) => new THREE.Color(...a);
+      this.key.color.lerp(v(this.pal.sunTint), useMoon ? 0.3 : 0.7);
+      if (!useMoon) this.key.intensity *= this.pal.sunBoost;
+      this.hemi.intensity *= this.pal.skyBoost;
+      this.hemi.color.copy(v(this.pal.hemiDay)).lerp(v(this.pal.hemiNight), 1 - day).lerp(v(k.duskHorizon), dusk * 0.25);
+      this.hemi.color.lerp(new THREE.Color(0.6, 0.62, 0.66), this.cloudCover * 0.6);
+      this.hemi.groundColor.copy(this.hemi.color).multiply(v(this.pal.groundTint));
+      const zen = v(k.nightZenith).lerp(v(k.dayZenith), day);
+      const hor = v(k.nightHorizon).lerp(v(k.dayHorizon), day).lerp(v(k.duskHorizon), dusk * 0.5);
+      // Under cloud the sky loses its colour, not only its brightness.
+      for (const c of [zen, hor]) {
+        const lum = c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722;
+        c.lerp(new THREE.Color(lum, lum * 1.01, lum * 1.06), this.cloudCover * 0.75);
+      }
+      const grey = 1 - 0.35 * this.cloudCover;
+      zen.multiplyScalar(grey * (1 + this.lightning * 4));
+      hor.multiplyScalar(1 - 0.2 * this.cloudCover);
+      const su = this.studio.material.uniforms;
+      su.uZenith.value.copy(zen);
+      su.uHorizon.value.copy(hor);
+      su.uSunTint.value.copy(sunColor).lerp(new THREE.Color(1, 1, 1), 0.5);
+      su.uSunGlow.value = above * (1 - 0.9 * this.cloudCover);
+      su.uRealSun.value.copy(this.sunDir);
+      this.horizonColor.copy(hor);
+      this.studio.position.copy(camera.position);
+    }
 
     // Shared uniforms for custom shaders.
     env.uSunDir.value.copy(this.keyDir);

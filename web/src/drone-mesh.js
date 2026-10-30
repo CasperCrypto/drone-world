@@ -7,7 +7,9 @@
 //     antenna, three-blade propellers;
 // with navigation lights as on aircraft (red left, green right, white strobe
 // at the back), propellers that blur into discs when they spin fast, and a
-// headlight that can be switched on for night flying. Swaps in a user's own
+// headlight that can be switched on for night flying. In the stylized and
+// dark studio styles the colours come from the palette and a glowing ring
+// under each motor brightens with the throttle. Swaps in a user's own
 // .glb/.gltf model on request.
 // Does NOT: change the flight physics. An uploaded model is only the look;
 // the builder (next milestone) will set mass and thrust from its parts.
@@ -17,6 +19,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { palette } from './palette.js';
 
 function blurTexture() {
   const c = document.createElement('canvas');
@@ -53,7 +56,8 @@ function carbonTexture() {
 }
 
 export class DroneMesh {
-  constructor() {
+  constructor(style = 'realistic') {
+    this.pal = palette(style);
     this.root = new THREE.Group();
     this.visual = new THREE.Group();
     this.root.add(this.visual);
@@ -76,6 +80,7 @@ export class DroneMesh {
     this.props = [];
     this.discs = [];
     this.leds = [];
+    this.glow = null;
   }
 
   // diagonal: motor-to-motor distance in metres.
@@ -85,12 +90,15 @@ export class DroneMesh {
     const s = diagonal;
     const arm = s / 2;
     const fpv = style === 'fpv';
-    const shell = new THREE.MeshPhysicalMaterial({ color: 0x8e9398, roughness: 0.42, metalness: 0.05, clearcoat: 0.35, clearcoatRoughness: 0.3 });
-    const dark = new THREE.MeshStandardMaterial({ color: 0x1d1f22, roughness: 0.55, metalness: 0.15 });
-    const carbon = new THREE.MeshStandardMaterial({ color: 0xffffff, map: this.carbonTex, roughness: 0.35, metalness: 0.3 });
-    const bell = new THREE.MeshStandardMaterial({ color: fpv ? 0xd9542b : 0x2a2c2f, roughness: 0.3, metalness: 0.85 });
+    const look = this.pal ? this.pal.drone : null;
+    const shell = new THREE.MeshPhysicalMaterial({ color: look ? look.shell : 0x8e9398, roughness: 0.42, metalness: 0.05, clearcoat: 0.35, clearcoatRoughness: 0.3 });
+    const dark = new THREE.MeshStandardMaterial({ color: look ? look.trim : 0x1d1f22, roughness: 0.55, metalness: 0.15 });
+    const carbon = new THREE.MeshStandardMaterial({ color: look ? look.trim : 0xffffff, map: look ? null : this.carbonTex, roughness: 0.35, metalness: look ? 0.1 : 0.3 });
+    const bell = new THREE.MeshStandardMaterial({ color: fpv ? 0xd9542b : look ? look.accent : 0x2a2c2f, roughness: 0.3, metalness: look ? 0.4 : 0.85 });
     const glass = new THREE.MeshPhysicalMaterial({ color: 0x050608, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02 });
-    const propMat = new THREE.MeshStandardMaterial({ color: fpv ? 0xff7a1a : 0x2b2d30, roughness: 0.45, metalness: 0.05, transparent: fpv, opacity: fpv ? 0.85 : 1 });
+    const propMat = new THREE.MeshStandardMaterial({ color: fpv ? 0xff7a1a : look ? look.trim : 0x2b2d30, roughness: 0.45, metalness: 0.05, transparent: fpv, opacity: fpv ? 0.85 : 1 });
+    // Motor rings: glow brighter with the throttle (bloom makes them shine).
+    this.glow = look ? new THREE.MeshStandardMaterial({ color: 0x000000, emissive: look.glow, emissiveIntensity: 1.5 }) : null;
 
     if (fpv) {
       const plate = new THREE.Mesh(new RoundedBoxGeometry(s * 0.34, s * 0.025, s * 0.16, 2, s * 0.01), carbon);
@@ -171,6 +179,11 @@ export class DroneMesh {
       b.position.set(x, s * 0.055, z);
       b.castShadow = true;
       this.visual.add(b);
+      if (this.glow) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(s * 0.052, s * 0.009, 8, 32).rotateX(Math.PI / 2), this.glow);
+        ring.position.set(x, s * 0.034, z);
+        this.visual.add(ring);
+      }
       if (!fpv) {
         const foot = new THREE.Mesh(new THREE.CylinderGeometry(s * 0.012, s * 0.018, s * 0.09, 8), dark);
         foot.position.set(x * 0.92, -s * 0.06, z * 0.92);
@@ -262,6 +275,7 @@ export class DroneMesh {
         m.material.emissiveIntensity = 3 + 6 * night;
       }
     }
+    if (this.glow) this.glow.emissiveIntensity = 1.2 + 7 * thrustFraction + 2 * night;
     this.headlight.intensity = this.headlightOn ? 60 : 0;
   }
 }

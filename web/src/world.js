@@ -21,6 +21,7 @@ import {
 } from './layout.js';
 import { env, linkEnv } from './shaders.js';
 import { makeLake } from './water.js';
+import { palette } from './palette.js';
 
 const KNOTS = 0.514444;
 
@@ -151,7 +152,8 @@ function sockTexture() {
 }
 
 export class World {
-  constructor(scene, terrain, textures, forest) {
+  constructor(scene, terrain, textures, forest, style = 'toon') {
+    this.pal = palette(style);
     this.scene = scene;
     this.terrain = terrain;
     this.tx = textures;
@@ -160,13 +162,20 @@ export class World {
     this.gates = [];
     this.nightMaterials = [];
     this.lights = [];
-    this.lake = makeLake(terrain);
+    this.lake = makeLake(terrain, style);
     scene.add(this.lake);
     this.addAirfield();
     this.addHangar();
     this.addHouses();
     this.addWindsock();
     this.addGates();
+  }
+
+  // A surface: the scanned material, or in the stylized and dark styles one plain colour.
+  surface(slot) {
+    if (!this.pal) return this.tx.material(slot);
+    const colors = this.pal.surfaces;
+    return new THREE.MeshStandardMaterial({ color: colors[slot] ?? colors.plaster, roughness: slot === 'metal' ? 0.55 : 0.88, metalness: slot === 'metal' ? 0.15 : 0 });
   }
 
   // Wind field description of the buildings (for wakes).
@@ -179,7 +188,7 @@ export class World {
 
   addAirfield() {
     const y0 = this.terrain.heightAt(RUNWAY.x, RUNWAY.z) + 0.04;
-    const asphalt = weatherproof(this.tx.material('asphalt'), 0.35);
+    const asphalt = weatherproof(this.surface('asphalt'), 0.35);
     const strip = new THREE.Mesh(metreUVs(new THREE.BoxGeometry(RUNWAY.length, 0.08, RUNWAY.width)), asphalt);
     strip.position.set(RUNWAY.x, y0 - 0.03, RUNWAY.z);
     strip.receiveShadow = true;
@@ -192,7 +201,7 @@ export class World {
     marks.receiveShadow = true;
     this.scene.add(marks);
 
-    const concrete = weatherproof(this.tx.material('concrete'), 0.3);
+    const concrete = weatherproof(this.surface('concrete'), 0.3);
     const apron = new THREE.Mesh(metreUVs(new THREE.BoxGeometry(APRON.w, 0.1, APRON.d)), concrete);
     apron.position.set(APRON.x, this.terrain.heightAt(APRON.x, APRON.z) + 0.02, APRON.z);
     apron.receiveShadow = true;
@@ -231,7 +240,7 @@ export class World {
   addHangar() {
     const { x, z, w, d, h } = HANGAR;
     const y = this.terrain.heightAt(x, z);
-    const metal = weatherproof(this.tx.material('metal'), 0.1);
+    const metal = weatherproof(this.surface('metal'), 0.1);
     const wallH = h * 0.45;
     const walls = new THREE.Mesh(metreUVs(new THREE.BoxGeometry(w, wallH, d)), metal);
     walls.position.set(x, y + wallH / 2, z);
@@ -278,11 +287,11 @@ export class World {
 
   addHouses() {
     const r = rng(42);
-    const plaster = weatherproof(this.tx.material('plaster'), 0.5);
-    const brick = weatherproof(this.tx.material('brick'), 0.5);
-    const tiles = weatherproof(this.tx.material('roof'), 0.3);
-    const metalRoof = weatherproof(this.tx.material('metal'), 0.1);
-    const wood = weatherproof(this.tx.material('wood'), 0.6);
+    const plaster = weatherproof(this.surface('plaster'), 0.5);
+    const brick = weatherproof(this.surface('brick'), 0.5);
+    const tiles = weatherproof(this.surface('roof'), 0.3);
+    const metalRoof = weatherproof(this.surface('metal'), 0.1);
+    const wood = weatherproof(this.surface('wood'), 0.6);
     const glassDark = new THREE.MeshStandardMaterial({ color: 0x1b2328, roughness: 0.08, metalness: 0.1 });
     const glassLit = new THREE.MeshStandardMaterial({ color: 0x1b2328, roughness: 0.08, metalness: 0.1, emissive: 0xffc27a, emissiveIntensity: 0 });
     this.nightMaterials.push({ mat: glassLit, on: 2.2 });
