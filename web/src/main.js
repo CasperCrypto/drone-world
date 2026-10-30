@@ -22,7 +22,8 @@ import { Controls } from './controls.js';
 import { Post } from './post.js';
 import { Sound } from './audio.js';
 import { gpuInfo, gpuAdvice } from './gpu.js';
-import { QUALITY, loadQualityKey, saveQualityKey } from './quality.js';
+import { QUALITY, loadQualityKey, saveQualityKey, STYLES, loadStyleKey, saveStyleKey } from './quality.js';
+import { palette } from './palette.js';
 import { PAD } from './layout.js';
 import {
   FlightModel, Mode, MODES, Vec3, cameraDronePreset, fpv5InchPreset,
@@ -48,6 +49,24 @@ const $ = (id) => document.getElementById(id);
 
 const qualityKey = loadQualityKey();
 const quality = QUALITY[qualityKey];
+const styleKey = loadStyleKey();
+const pal = palette(styleKey);
+
+// Stylized style: toon lighting. The sun's light falls off in three soft
+// bands (shade, half-lit, lit) instead of a smooth gradient, on every
+// standard material; shadows and the sky light stay smooth.
+if (pal?.toon) {
+  THREE.ShaderChunk.common += `
+float dwToonRamp(float x) {
+  return 0.08 * x + 0.52 * smoothstep(0.0, 0.08, x) + 0.4 * smoothstep(0.32, 0.42, x);
+}`;
+  for (const chunk of ['lights_physical_pars_fragment', 'lights_lambert_pars_fragment', 'lights_phong_pars_fragment']) {
+    THREE.ShaderChunk[chunk] = THREE.ShaderChunk[chunk].replace(
+      'vec3 irradiance = dotNL * directLight.color;',
+      'vec3 irradiance = dwToonRamp( dotNL ) * directLight.color;',
+    );
+  }
+}
 
 // --- renderer, scene, camera -------------------------------------------------
 const canvas = $('scene');
@@ -87,7 +106,7 @@ const sound = new Sound();
 let resScale = 1; // automatic resolution scale, lowered when frames get slow
 let perfClock = 0;
 let perfFrames = 0;
-const drone = new DroneMesh();
+const drone = new DroneMesh(styleKey);
 const controls = new Controls($('touch'));
 const model = new FlightModel();
 let presetKey = 'camera';
@@ -365,6 +384,14 @@ function wireWorldSettings() {
   $('wind-speed').addEventListener('input', (e) => { $('wind-speed-out').textContent = `${e.target.value} m/s`; setWind(); });
   $('wind-dir').addEventListener('input', (e) => { $('wind-dir-out').textContent = compass(Number(e.target.value)); setWind(); });
   $('wind-gust').addEventListener('change', setWind);
+  const ssel = $('opt-style');
+  for (const [key, label] of Object.entries(STYLES)) ssel.add(new Option(label, key));
+  ssel.value = styleKey;
+  ssel.addEventListener('change', () => {
+    saveStyleKey(ssel.value);
+    $('quality-note').textContent = 'Saved. Reload the page to apply.';
+    $('btn-reload').hidden = false;
+  });
   const qsel = $('opt-quality');
   for (const [key, q] of Object.entries(QUALITY)) qsel.add(new Option(q.label, key));
   qsel.value = qualityKey;
@@ -432,6 +459,7 @@ function wireUi() {
 // comes back up; the extras stay off until the page is reloaded.
 const LIGHTEN = [
   ['lake reflections off', () => reflection?.disable() ?? false],
+  ['contact shadows off', () => post.disableAO()],
   ['glow off', () => { if (!post.bloom || !post.bloom.enabled) return false; post.bloom.enabled = false; return true; }],
   ['less grass', () => grass.setDensity(0.55)],
   ['cheaper shadows', () => envr.sky.setShadowMapSize(1024)],
@@ -547,28 +575,29 @@ function frame() {
 
 async function start() {
   progress(0.02, 'Loading scanned ground, rock and building textures…');
-  const textures = await new TextureLibrary(renderer).load(quality.groundTex, (f) => progress(0.02 + f * 0.3));
+  // The stylized and dark styles only use the scans as a faint hint: smaller textures load faster.
+  const textures = await new TextureLibrary(renderer).load(pal ? 512 : quality.groundTex, (f) => progress(0.02 + f * 0.3));
   await nextFrame();
   progress(0.34, 'Shaping the landscape…');
   await nextFrame();
   terrain = new Terrain(7);
-  scene.add(terrain.buildMesh(textures));
-  scene.add(terrain.buildFarMesh(textures));
+  scene.add(terrain.buildMesh(textures, styleKey));
+  scene.add(terrain.buildFarMesh(textures, styleKey));
   progress(0.48, 'Growing the forest…');
   await nextFrame();
-  forest = new Forest(scene, terrain, textures, quality);
+  forest = new Forest(scene, terrain, textures, quality, styleKey);
   await forest.build(renderer, (f) => progress(0.48 + f * 0.32, f < 0.6 ? 'Growing the forest…' : 'Planting and baking distant trees…'));
   progress(0.82, 'Building the airfield and the farm…');
   await nextFrame();
-  world = new World(scene, terrain, textures, forest);
-  grass = new Grass(terrain, textures, { count: quality.grass, patch: quality.grassPatch });
+  world = new World(scene, terrain, textures, forest, styleKey);
+  grass = new Grass(terrain, textures, { count: quality.grass, patch: quality.grassPatch }, styleKey);
   grass.mesh.layers.set(1);
   scene.add(grass.mesh);
-  envr = new Environment({ renderer, scene, terrain, forest, world, quality });
+  envr = new Environment({ renderer, scene, terrain, forest, world, quality, style: styleKey });
   envr.weather.particles.layers.set(1);
   if (quality.reflections) reflection = new LakeReflection(world.lake, 0.5);
   scene.add(drone.root);
-  post = new Post(renderer, scene, camera, quality);
+  post = new Post(renderer, scene, camera, quality, styleKey);
   wireUi();
   $('gpu-name').textContent = `${gpu.name}${gpu.kind === 'software' ? ' (software, no graphics card)' : gpu.kind === 'integrated' ? ' (built-in graphics)' : ''}`;
   const advice = gpuAdvice(gpu);
@@ -598,6 +627,8 @@ async function start() {
     terrain,
     world,
     forest,
+    grass,
+    post,
     env: envr,
     renderer,
     get position() { return dronePos.clone(); },
@@ -614,6 +645,11 @@ async function start() {
       camPos.copy(dronePos).add(new THREE.Vector3(-Math.cos(heading) * 2.2, 0.7, Math.sin(heading) * 2.2));
     },
     pause(on = true) { paused = on; },
+    // Draw one frame now and return it as a PNG data URL (for tests and bug reports).
+    snapshot() {
+      post.render(0);
+      return renderer.domElement.toDataURL('image/png');
+    },
     // Run the simulation without drawing (for tests): seconds at 60 Hz with fixed sticks.
     simulate(seconds, sticks = { throttle: 0, yaw: 0, pitch: 0, roll: 0 }) {
       for (let t = 0; t < seconds; t += 1 / 60) {

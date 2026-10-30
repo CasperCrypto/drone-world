@@ -16,6 +16,7 @@ import * as THREE from 'three';
 import { HALF } from './layout.js';
 import { buildTree, SPECIES } from './trees.js';
 import { env, WIND_GLSL, linkEnv } from './shaders.js';
+import { palette } from './palette.js';
 
 const SPECIES_KEYS = ['pine', 'spruce', 'oak', 'birch'];
 const VARIANTS_PER_SPECIES = 2;
@@ -86,7 +87,9 @@ function addSway(material, treeH, cacheKey, extraFragment) {
 }
 
 export class Forest {
-  constructor(scene, terrain, textures, quality) {
+  constructor(scene, terrain, textures, quality, style = 'toon') {
+    this.pal = palette(style);
+    this.stylized = !!this.pal;
     this.scene = scene;
     this.terrain = terrain;
     this.textures = textures;
@@ -106,20 +109,30 @@ export class Forest {
     let v = 0;
     for (const key of SPECIES_KEYS) {
       const sp = SPECIES[key];
-      const barkMat = new THREE.MeshStandardMaterial({
-        map: tx.treeTexture(`bark/${sp.bark}_color_1k.jpg`, true),
-        normalMap: tx.treeTexture(`bark/${sp.bark}_normal_1k.jpg`, false),
-        roughnessMap: tx.treeTexture(`bark/${sp.bark}_roughness_1k.jpg`, false),
-        aoMap: tx.treeTexture(`bark/${sp.bark}_ao_1k.jpg`, false),
-        roughness: 1,
-        metalness: 0,
-      });
-      const leafTex = tx.treeTexture(`leaves/${sp.leaf}_color.png`, true);
-      const tint = new THREE.Color(...sp.leaves.tint);
+      let barkMat;
+      let leafTex = null;
+      let tint;
+      if (this.stylized) {
+        // Stylized and dark studio: plain colours, the gradient comes from the geometry.
+        barkMat = new THREE.MeshStandardMaterial({ color: new THREE.Color(...(key === 'birch' ? this.pal.birchBark : this.pal.bark)), roughness: 0.9, metalness: 0 });
+        tint = new THREE.Color(...this.pal.leaves[key]);
+      } else {
+        barkMat = new THREE.MeshStandardMaterial({
+          map: tx.treeTexture(`bark/${sp.bark}_color_1k.jpg`, true),
+          normalMap: tx.treeTexture(`bark/${sp.bark}_normal_1k.jpg`, false),
+          roughnessMap: tx.treeTexture(`bark/${sp.bark}_roughness_1k.jpg`, false),
+          aoMap: tx.treeTexture(`bark/${sp.bark}_ao_1k.jpg`, false),
+          roughness: 1,
+          metalness: 0,
+        });
+        leafTex = tx.treeTexture(`leaves/${sp.leaf}_color.png`, true);
+        tint = new THREE.Color(...sp.leaves.tint);
+      }
+      const look = this.stylized ? 'stylized' : 'realistic';
       for (let i = 0; i < VARIANTS_PER_SPECIES; i++) {
         const seed = 1000 + v * 7919;
-        const lod0 = buildTree(key, seed, 0);
-        const lod1 = buildTree(key, seed, 1);
+        const lod0 = buildTree(key, seed, 0, look);
+        const lod1 = buildTree(key, seed, 1, look);
         this.variants.push({ key, index: v, lod0, lod1, barkMat, leafTex, tint, conifer: key === 'spruce' || key === 'pine' });
         v++;
         onProgress((v / (SPECIES_KEYS.length * VARIANTS_PER_SPECIES)) * 0.4);
@@ -140,6 +153,27 @@ export class Forest {
     const H = variant.lod0.height;
     const bark = variant.barkMat.clone();
     addSway(bark, H, 'dw-tree-bark');
+    if (this.stylized) {
+      // Smooth clumps: closed meshes, no cut-outs; a little light through them.
+      const puffs = new THREE.MeshStandardMaterial({ vertexColors: true, color: variant.tint, roughness: 0.92, metalness: 0 });
+      addSway(puffs, H, 'dw-tree-puffs', (shader) => {
+        shader.fragmentShader = shader.fragmentShader
+          .replace('#include <common>', '#include <common>\nuniform vec3 uSunDir;\nuniform vec3 uSunColor;')
+          .replace('#include <emissivemap_fragment>', `
+vec3 dwV = normalize(-vViewPosition);
+vec3 dwSunV = normalize((viewMatrix * vec4(uSunDir, 0.0)).xyz);
+float dwBack = pow(max(dot(-dwV, dwSunV), 0.0), 4.0);
+float dwRim = pow(1.0 - max(dot(normal, dwV), 0.0), 3.0);
+totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.03 + 0.12 * dwBack) + diffuseColor.rgb * dwRim * 0.25;`);
+      });
+      const plain = (key) => {
+        const m = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+        addSway(m, H, key);
+        return m;
+      };
+      variant.mat = { bark, leaves: puffs, barkDepth: plain('dw-tree-depth-bark'), leafDepth: plain('dw-tree-depth-puffs') };
+      return;
+    }
     const leafMat = new THREE.MeshStandardMaterial({
       map: variant.leafTex,
       alphaTest: 0.42,
@@ -227,16 +261,24 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
     const cam = new THREE.OrthographicCamera();
     // Kept pixels are written fully opaque, so mipmaps average colour and
     // coverage separately and the impostor shader can divide one by the other.
-    const albedoMat = (map, alpha, tint = new THREE.Color(1, 1, 1)) => new THREE.ShaderMaterial({
+    const albedoMat = (map, alpha, tint = new THREE.Color(1, 1, 1), vertexColors = false) => new THREE.ShaderMaterial({
       side: THREE.DoubleSide,
-      uniforms: { map: { value: map }, useAlpha: { value: alpha ? 1 : 0 }, tint: { value: tint } },
-      vertexShader: `varying vec2 vUv;
-        void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
-      fragmentShader: `uniform sampler2D map; uniform float useAlpha; uniform vec3 tint; varying vec2 vUv;
+      vertexColors,
+      uniforms: { map: { value: map }, useMap: { value: map ? 1 : 0 }, useAlpha: { value: alpha ? 1 : 0 }, tint: { value: tint } },
+      vertexShader: `varying vec2 vUv; varying vec3 vCol;
         void main() {
-          vec4 c = texture2D(map, vUv);
+          vUv = uv;
+          vCol = vec3(1.0);
+          #ifdef USE_COLOR
+            vCol = color;
+          #endif
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `uniform sampler2D map; uniform float useMap; uniform float useAlpha; uniform vec3 tint; varying vec2 vUv; varying vec3 vCol;
+        void main() {
+          vec4 c = useMap > 0.5 ? texture2D(map, vUv) : vec4(1.0);
           if (useAlpha > 0.5 && c.a < 0.42) discard;
-          gl_FragColor = vec4(c.rgb * tint, 1.0);
+          gl_FragColor = vec4(c.rgb * tint * vCol, 1.0);
         }`,
     });
     const normalMat = (map, alpha) => new THREE.ShaderMaterial({
@@ -276,8 +318,10 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.04 + 0.22 * dwBack);`
         cam.position.set(Math.sin(a) * 80 * ce, centerY + 80 * Math.sin(BAKE_ELEVATION), Math.cos(a) * 80 * ce);
         cam.lookAt(0, centerY, 0);
         for (const [rt, kind] of [[colorRT, 'color'], [normalRT, 'normal']]) {
-          bark.material = kind === 'color' ? albedoMat(variant.barkMat.map, false) : normalMat(null, false);
-          leaves.material = kind === 'color' ? albedoMat(variant.leafTex, true, variant.tint) : normalMat(variant.leafTex, true);
+          bark.material = kind === 'color' ? albedoMat(variant.barkMat.map, false, variant.barkMat.map ? undefined : variant.barkMat.color) : normalMat(null, false);
+          leaves.material = kind === 'color'
+            ? albedoMat(variant.leafTex, !!variant.leafTex, variant.tint, this.stylized)
+            : normalMat(variant.leafTex, !!variant.leafTex);
           renderer.setRenderTarget(rt);
           rt.viewport.set(view * ATLAS_CELL, row * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL);
           rt.scissor.set(view * ATLAS_CELL, row * ATLAS_CELL, ATLAS_CELL, ATLAS_CELL);

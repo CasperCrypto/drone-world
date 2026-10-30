@@ -63,6 +63,16 @@ training and experimentation sandbox, not a certified simulator.
 - Graphics presets from Low (phones, old laptops) to Ultra (strong graphics
   cards).
 
+**Art styles** (Settings → Graphics)
+- **Stylized** (default): bright designed colours instead of photo
+  textures, toon lighting (the sun's light in three soft bands), a colourful
+  sky and ground light, ink outlines on silhouettes and edges, contact
+  shadows (screen-space ambient occlusion) so things sit on the ground,
+  glowing motor rings and lights, and a saturated, contrasty colour grade.
+- **Dark studio**: the same world in calm greys with height lines every 5 m
+  and a 50 m grid, like an architectural model.
+- **Realistic**: the scanned textures and leaf cards.
+
 ## What does not exist yet
 
 Batteries and flight time, air density from temperature and height, motor
@@ -127,7 +137,8 @@ each stick.
 | `web/src/environment.js` | Keeps time, weather, wind and light in step each frame. |
 | `web/src/shaders.js` | GLSL and uniforms shared by the custom shaders (wind, noise). |
 | `web/src/textures.js` | Loads the scanned textures; packs the ground layers into texture arrays. |
-| `web/src/post.js`, `quality.js` | Bloom, anti-aliasing, tone mapping; graphics presets. |
+| `web/src/post.js`, `quality.js` | Outlines and contact shadows from the depth buffer, bloom, tone mapping, colour grade, anti-aliasing; graphics presets and art style. |
+| `web/src/palette.js` | Colours and look switches of the Stylized and Dark studio styles. |
 | `web/src/controls.js` | Keyboard, Gamepad API (gamepads and RC radios), touch sticks. |
 | `web/src/drone-mesh.js` | The drones' look, lights and headlight; loading your own model. |
 | `web/src/main.js` | Loading, cameras, HUD, settings, the main loop. |

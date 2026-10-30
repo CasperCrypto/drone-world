@@ -17,12 +17,12 @@ import { env } from './shaders.js';
 import { WINDSOCK } from './layout.js';
 
 export class Environment {
-  constructor({ renderer, scene, terrain, forest, world, quality }) {
+  constructor({ renderer, scene, terrain, forest, world, quality, style = 'toon' }) {
     this.renderer = renderer;
     this.scene = scene;
     this.terrain = terrain;
     this.world = world;
-    this.sky = new SkySystem(renderer, scene);
+    this.sky = new SkySystem(renderer, scene, style);
     this.sky.shadowSize = quality.shadowSize;
     this.sky.key.shadow.mapSize.set(quality.shadowMap, quality.shadowMap);
     this.weather = new Weather(scene, quality);
@@ -116,6 +116,10 @@ export class Environment {
     if (cur.cloudCover > 0.5) {
       const grey = (env.uAmbient.value.r + env.uAmbient.value.g + env.uAmbient.value.b) / 3 * 0.36;
       this.fogColor.lerp(new THREE.Color(grey, grey * 1.02, grey * 1.05), (cur.cloudCover - 0.5) * 2);
+    }
+    if (this.sky.stylized) {
+      // Fog blends into the designed sky's horizon, greyer in thick weather.
+      this.fogColor.copy(this.sky.horizonColor).lerp(new THREE.Color(0.2, 0.21, 0.22), Math.min(1, cur.fog * 150) * 0.5);
     }
     this.scene.fog.color.copy(this.fogColor);
     this.scene.fog.density = cur.fog;
