@@ -64,14 +64,24 @@ training and experimentation sandbox, not a certified simulator.
   cards).
 
 **Art styles** (Settings → Graphics)
-- **Stylized** (default): bright designed colours instead of photo
+- **Cinematic** (default): the scanned textures seen through a camera:
+  haze that thins with height and glows round the sun, a lens flare when
+  the sun is in view, camera motion blur, a soft depth of field focused on
+  the drone, and a film-like finish (light sharpening, colour grade,
+  vignette, faint grain). The drone is clear-coated metallic paint that
+  reflects the world around it (a small cube camera follows it).
+- **Stylized**: bright designed colours instead of photo
   textures, toon lighting (the sun's light in three soft bands), a colourful
   sky and ground light, ink outlines on silhouettes and edges, contact
   shadows (screen-space ambient occlusion) so things sit on the ground,
   glowing motor rings and lights, and a saturated, contrasty colour grade.
 - **Dark studio**: the same world in calm greys with height lines every 5 m
   and a 50 m grid, like an architectural model.
-- **Realistic**: the scanned textures and leaf cards.
+
+Every style uses temporal anti-aliasing (TAA): the camera moves by a
+fraction of a pixel each frame and the frames are blended, so edges, grass
+and leaves stay smooth instead of flickering. When frames are slow the game
+keeps the resolution (at least 80%) and switches extras off first.
 
 ## What does not exist yet
 
@@ -137,7 +147,9 @@ each stick.
 | `web/src/environment.js` | Keeps time, weather, wind and light in step each frame. |
 | `web/src/shaders.js` | GLSL and uniforms shared by the custom shaders (wind, noise). |
 | `web/src/textures.js` | Loads the scanned textures; packs the ground layers into texture arrays. |
-| `web/src/post.js`, `quality.js` | Outlines and contact shadows from the depth buffer, bloom, tone mapping, colour grade, anti-aliasing; graphics presets and art style. |
+| `web/src/post.js`, `quality.js` | The post-processing chain per style, outlines and contact shadows (Stylized, Dark studio), bloom, tone mapping, colour grade; graphics presets and art style. |
+| `web/src/cinematic.js` | TAA, haze and sun glow, lens flare, motion blur, depth of field, film finish. |
+| `web/src/probe.js` | The reflection probe for the drone's paint. |
 | `web/src/palette.js` | Colours and look switches of the Stylized and Dark studio styles. |
 | `web/src/controls.js` | Keyboard, Gamepad API (gamepads and RC radios), touch sticks. |
 | `web/src/drone-mesh.js` | The drones' look, lights and headlight; loading your own model. |

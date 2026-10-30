@@ -20,6 +20,7 @@ import { PRESETS as WEATHER } from './weather.js';
 import { DroneMesh } from './drone-mesh.js';
 import { Controls } from './controls.js';
 import { Post } from './post.js';
+import { ReflectionProbe } from './probe.js';
 import { Sound } from './audio.js';
 import { gpuInfo, gpuAdvice } from './gpu.js';
 import { QUALITY, loadQualityKey, saveQualityKey, STYLES, loadStyleKey, saveStyleKey } from './quality.js';
@@ -102,6 +103,7 @@ let grass;
 let envr;
 let post;
 let reflection = null;
+let probe = null; // what the drone's paint reflects (Cinematic)
 const sound = new Sound();
 let resScale = 1; // automatic resolution scale, lowered when frames get slow
 let perfClock = 0;
@@ -460,6 +462,8 @@ function wireUi() {
 const LIGHTEN = [
   ['lake reflections off', () => reflection?.disable() ?? false],
   ['contact shadows off', () => post.disableAO()],
+  ['motion blur and depth of field off', () => post.disableLens()],
+  ['live reflections on the drone off', () => { if (!probe) return false; probe = null; return true; }],
   ['glow off', () => { if (!post.bloom || !post.bloom.enabled) return false; post.bloom.enabled = false; return true; }],
   ['less grass', () => grass.setDensity(0.55)],
   ['cheaper shadows', () => envr.sky.setShadowMapSize(1024)],
@@ -476,10 +480,13 @@ function adaptResolution(dt) {
   perfClock = 0;
   perfFrames = 0;
   if (paused || document.hidden) return;
+  // Sharpness first: like other browser games, keep (nearly) full resolution
+  // and accept about 30 frames per second; switch extras off before
+  // lowering the resolution, and never go below 80%.
   let next = resScale;
-  if (rate < 45) {
-    if (resScale > 0.8) {
-      next = Math.max(0.8, resScale * 0.9);
+  if (rate < 27) {
+    if (resScale > 0.9) {
+      next = Math.max(0.9, resScale * 0.95);
     } else {
       let done = false;
       while (lightenStep < LIGHTEN.length && !done) {
@@ -489,12 +496,12 @@ function adaptResolution(dt) {
           show(`Slow frames: ${label}.`, 1800);
         }
       }
-      if (!done && resScale > 0.55) next = Math.max(0.55, resScale * 0.9);
+      if (!done && resScale > 0.8) next = Math.max(0.8, resScale * 0.92);
     }
-  } else if (rate > 58 && resScale < 1) {
+  } else if (rate > 45 && resScale < 1) {
     next = Math.min(1, resScale * 1.08);
   }
-  if (rate < 28 && lightenStep >= LIGHTEN.length && !adaptResolution.hinted) {
+  if (rate < 20 && lightenStep >= LIGHTEN.length && !adaptResolution.hinted) {
     adaptResolution.hinted = true;
     show(gpuAdvice(gpu) || `Running at ${rate.toFixed(0)} frames per second. Choose a lower quality in Settings → Graphics.`, 9000);
   }
@@ -570,6 +577,11 @@ function frame() {
   adaptResolution(dt);
   renderer.info.reset();
   reflection?.render(renderer, scene, camera);
+  if (probe?.update(dt, scene, dronePos, drone.root) && drone.envMap !== probe.texture) drone.setEnvMap(probe.texture);
+  // Focus on the drone; the chase and FPV cameras move with it.
+  const focus = camera.position.distanceTo(dronePos);
+  post.setView(focus, camMode !== 'ground', camMode === 'fpv' ? 0 : camMode === 'ground' ? 0.7 : 0.85);
+  post.setAtmosphere(envr.atmosphere.density, envr.atmosphere.scaleHeight, envr.atmosphere.base);
   post.render(dt);
 }
 
@@ -598,6 +610,7 @@ async function start() {
   if (quality.reflections) reflection = new LakeReflection(world.lake, 0.5);
   scene.add(drone.root);
   post = new Post(renderer, scene, camera, quality, styleKey);
+  if (!pal && quality.probe) probe = new ReflectionProbe(renderer, 128);
   wireUi();
   $('gpu-name').textContent = `${gpu.name}${gpu.kind === 'software' ? ' (software, no graphics card)' : gpu.kind === 'integrated' ? ' (built-in graphics)' : ''}`;
   const advice = gpuAdvice(gpu);

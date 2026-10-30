@@ -7,9 +7,12 @@
 //     antenna, three-blade propellers;
 // with navigation lights as on aircraft (red left, green right, white strobe
 // at the back), propellers that blur into discs when they spin fast, and a
-// headlight that can be switched on for night flying. In the stylized and
-// dark studio styles the colours come from the palette and a glowing ring
-// under each motor brightens with the throttle. Swaps in a user's own
+// headlight that can be switched on for night flying. In the Cinematic
+// style the body is clear-coated metallic paint like a car's, reflecting
+// the world around it (probe.js); in the stylized and dark studio styles
+// the colours come from the palette and a glowing ring under each motor
+// brightens with the throttle. Every opaque drone material writes alpha
+// 0.5, which tells the post-processing (cinematic.js) not to smear it. Swaps in a user's own
 // .glb/.gltf model on request.
 // Does NOT: change the flight physics. An uploaded model is only the look;
 // the builder (next milestone) will set mass and thrust from its parts.
@@ -35,6 +38,15 @@ function blurTexture() {
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;
+}
+
+// Opaque drone surfaces write alpha 0.5: motion blur and TAA treat them as the drone.
+function markDrone(mat) {
+  mat.onBeforeCompile = (shader) => {
+    shader.fragmentShader = shader.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\ngl_FragColor.a = 0.5;');
+  };
+  mat.customProgramCacheKey = () => 'dw-drone';
+  return mat;
 }
 
 function carbonTexture() {
@@ -91,12 +103,20 @@ export class DroneMesh {
     const arm = s / 2;
     const fpv = style === 'fpv';
     const look = this.pal ? this.pal.drone : null;
-    const shell = new THREE.MeshPhysicalMaterial({ color: look ? look.shell : 0x8e9398, roughness: 0.42, metalness: 0.05, clearcoat: 0.35, clearcoatRoughness: 0.3 });
-    const dark = new THREE.MeshStandardMaterial({ color: look ? look.trim : 0x1d1f22, roughness: 0.55, metalness: 0.15 });
+    // Cinematic: metallic blue-grey paint under a glossy clear coat, satin
+    // black trim, anodised gunmetal motors, like a well-made car.
+    const shell = look
+      ? new THREE.MeshPhysicalMaterial({ color: look.shell, roughness: 0.42, metalness: 0.05, clearcoat: 0.35, clearcoatRoughness: 0.3 })
+      : new THREE.MeshPhysicalMaterial({ color: 0x55687a, roughness: 0.34, metalness: 0.55, clearcoat: 1, clearcoatRoughness: 0.035 });
+    const dark = new THREE.MeshPhysicalMaterial({ color: look ? look.trim : 0x16181b, roughness: look ? 0.55 : 0.42, metalness: 0.15, clearcoat: look ? 0 : 0.4, clearcoatRoughness: 0.25 });
     const carbon = new THREE.MeshStandardMaterial({ color: look ? look.trim : 0xffffff, map: look ? null : this.carbonTex, roughness: 0.35, metalness: look ? 0.1 : 0.3 });
-    const bell = new THREE.MeshStandardMaterial({ color: fpv ? 0xd9542b : look ? look.accent : 0x2a2c2f, roughness: 0.3, metalness: look ? 0.4 : 0.85 });
+    const bell = new THREE.MeshStandardMaterial({ color: fpv ? 0xd9542b : look ? look.accent : 0x3a3f46, roughness: look ? 0.3 : 0.24, metalness: look ? 0.4 : 1 });
     const glass = new THREE.MeshPhysicalMaterial({ color: 0x050608, roughness: 0.04, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02 });
-    const propMat = new THREE.MeshStandardMaterial({ color: fpv ? 0xff7a1a : look ? look.trim : 0x2b2d30, roughness: 0.45, metalness: 0.05, transparent: fpv, opacity: fpv ? 0.85 : 1 });
+    const propMat = new THREE.MeshStandardMaterial({ color: fpv ? 0xff7a1a : look ? look.trim : 0x24262a, roughness: 0.45, metalness: 0.05, transparent: fpv, opacity: fpv ? 0.85 : 1 });
+    for (const m of [shell, dark, carbon, bell, glass]) markDrone(m);
+    if (!fpv) markDrone(propMat);
+    this.materials = [shell, dark, carbon, bell, glass, propMat];
+    if (this.envMap) for (const m of this.materials) m.envMap = this.envMap;
     // Motor rings: glow brighter with the throttle (bloom makes them shine).
     this.glow = look ? new THREE.MeshStandardMaterial({ color: 0x000000, emissive: look.glow, emissiveIntensity: 1.5 }) : null;
 
@@ -113,7 +133,7 @@ export class DroneMesh {
         this.visual.add(standoff);
       }
       const battery = new THREE.Mesh(new RoundedBoxGeometry(s * 0.3, s * 0.11, s * 0.14, 3, s * 0.015),
-        new THREE.MeshStandardMaterial({ color: 0x2f6fd6, roughness: 0.5, metalness: 0.1 }));
+        markDrone(new THREE.MeshStandardMaterial({ color: 0x2f6fd6, roughness: 0.5, metalness: 0.1 })));
       battery.position.y = s * 0.18;
       battery.castShadow = true;
       this.visual.add(battery);
@@ -225,6 +245,16 @@ export class DroneMesh {
     led(0xffffff, -s * (fpv ? 0.18 : 0.24), s * 0.02, 0, 'strobe');
     this.headlight.position.set(s * 0.25, -s * 0.05, 0);
     this.size = diagonal;
+  }
+
+  /** Reflections of the world around the drone (probe.js), for the Cinematic style. */
+  setEnvMap(texture) {
+    const first = !this.envMap;
+    this.envMap = texture;
+    for (const m of this.materials || []) {
+      m.envMap = texture;
+      if (first) m.needsUpdate = true;
+    }
   }
 
   setHeadlight(on) {
