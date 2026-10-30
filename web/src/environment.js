@@ -5,7 +5,9 @@
 // it advances them, moves the sun and moon (sky.js), updates the weather
 // (weather.js), samples the wind field (wind.js) for the drone and the
 // windsock, sets fog and exposure, and feeds the shared shader uniforms so
-// grass, trees, water and ground all move and look the same.
+// grass, trees, water and ground all move and look the same. In the
+// Cinematic style the haze is drawn by post.js instead of the materials'
+// fog; this file works out its density and height from the weather.
 // Does NOT: run the flight model; main.js asks windAt() and passes it on.
 
 import * as THREE from 'three';
@@ -14,11 +16,14 @@ import { Weather, PRESETS } from './weather.js';
 import { WindField, GUSTINESS, SHADER_MODES } from './wind.js';
 import { polandClockToUtc } from './solar.js';
 import { env } from './shaders.js';
-import { WINDSOCK } from './layout.js';
+import { WINDSOCK, WATER_LEVEL } from './layout.js';
 
 export class Environment {
-  constructor({ renderer, scene, terrain, forest, world, quality, style = 'toon' }) {
+  constructor({ renderer, scene, terrain, forest, world, quality, style = 'realistic' }) {
     this.renderer = renderer;
+    this.cinematic = style === 'realistic';
+    this.exposureScale = 1;
+    this.atmosphere = { density: 0, scaleHeight: 1000, base: WATER_LEVEL };
     this.scene = scene;
     this.terrain = terrain;
     this.world = world;
@@ -108,7 +113,7 @@ export class Environment {
       windX: this.wind.dirX * this.windSpeed * 1.6,
       windZ: this.wind.dirZ * this.windSpeed * 1.6,
     }, camera, focus, dt);
-    this.renderer.toneMappingExposure = this.light.exposure;
+    this.renderer.toneMappingExposure = this.light.exposure * this.exposureScale;
 
     // Fog: the colour of the horizon sky, thicker in fog and rain.
     const sunTint = env.uSunColor.value.clone().multiplyScalar(0.04 * (1 - cur.cloudCover));
@@ -117,14 +122,26 @@ export class Environment {
       const grey = (env.uAmbient.value.r + env.uAmbient.value.g + env.uAmbient.value.b) / 3 * 0.36;
       this.fogColor.lerp(new THREE.Color(grey, grey * 1.02, grey * 1.05), (cur.cloudCover - 0.5) * 2);
     }
+    if (this.cinematic) {
+      // The sky blends into a bright, bluish horizon; post.js draws the haze over the land.
+      this.fogColor.copy(env.uAmbient.value).multiplyScalar(0.9).add(sunTint.multiplyScalar(4));
+    }
     if (this.sky.stylized) {
       // Fog blends into the designed sky's horizon, greyer in thick weather.
       this.fogColor.copy(this.sky.horizonColor).lerp(new THREE.Color(0.2, 0.21, 0.22), Math.min(1, cur.fog * 150) * 0.5);
     }
     this.scene.fog.color.copy(this.fogColor);
-    this.scene.fog.density = cur.fog;
     env.uFogColor.value.copy(this.fogColor);
-    env.uFogDensity.value = cur.fog;
+    if (this.cinematic) {
+      // Haze drawn in post.js: denser and lower in fog, a deep thin layer on clear days.
+      this.scene.fog.density = 0;
+      env.uFogDensity.value = 0;
+      this.atmosphere.density = cur.fog * 0.85;
+      this.atmosphere.scaleHeight = THREE.MathUtils.lerp(1200, 150, THREE.MathUtils.smoothstep(cur.fog, 0.0008, 0.006));
+    } else {
+      this.scene.fog.density = cur.fog;
+      env.uFogDensity.value = cur.fog;
+    }
 
     // Shared shader uniforms.
     env.uTime.value = this.time % 3600;

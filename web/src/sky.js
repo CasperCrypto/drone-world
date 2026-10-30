@@ -90,6 +90,7 @@ export class SkySystem {
     this.cloudCover = 0.1;
     this.cloudDark = 0;
     this.lightning = 0;
+    this.skyLightScale = 1;
     this.cloudOffset = new THREE.Vector2();
 
     this.sky = this.makeSky();
@@ -419,6 +420,8 @@ void main() {
       this.horizonColor.copy(hor);
       this.studio.position.copy(camera.position);
     }
+
+    this.hemi.intensity *= this.skyLightScale;
 
     // Shared uniforms for custom shaders.
     env.uSunDir.value.copy(this.keyDir);

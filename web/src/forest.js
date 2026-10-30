@@ -176,9 +176,7 @@ totalEmissiveRadiance += diffuseColor.rgb * uSunColor * (0.03 + 0.12 * dwBack) +
     }
     const leafMat = new THREE.MeshStandardMaterial({
       map: variant.leafTex,
-      alphaTest: 0.42,
-      // With multisampling, soft leaf edges instead of hard, flickering cut-outs.
-      alphaToCoverage: this.quality.msaa > 0,
+      alphaTest: 0.42, // hard cut-outs; TAA (post.js) smooths their edges
       side: THREE.DoubleSide,
       roughness: 0.78,
       metalness: 0,

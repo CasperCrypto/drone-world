@@ -1,71 +1,84 @@
-// post.js — the final image: outlines, contact shadows, glow, tone mapping, grade.
+// post.js — the final image: anti-aliasing, air, glow, tone mapping, grade.
 //
-// Does: renders the scene into a high-dynamic-range buffer (with hardware
-// multisampling where the preset asks for it). In the stylized and dark
-// studio styles it then adds, from the depth buffer alone (no second scene
-// render):
-//   contact shadows (screen-space ambient occlusion, half resolution,
-//     sample count from the quality preset), so objects sit on the ground;
-//   ink outlines on silhouettes and outer creases (second difference of
-//     1/depth: zero on any flat surface, large at edges), thinner and
-//     fading with distance, never on grass blades.
-// Then bloom so lamps, the drone's motor rings and LEDs, the sun and its
-// glints glow; tone mapping (ACES filmic) with the exposure the sky sets;
-// a colour grade (saturation, contrast curve, split toning, vignette) from
-// the style's palette; and SMAA edge smoothing.
-// Does NOT: depth of field, motion blur or screen-space reflections.
+// Does: renders the scene into a high-dynamic-range buffer, then:
+//   in the Cinematic style (realistic textures): haze with a sun glow and a
+//     lens flare, camera motion blur and a soft depth of field, filmic tone
+//     mapping (AgX) and a film-like finish (cinematic.js);
+//   in the Stylized and Dark studio styles: contact shadows and ink
+//     outlines from the depth buffer (below), ACES tone mapping and a
+//     colour grade from the style's palette;
+// and in every style temporal anti-aliasing (TAA): the camera moves by a
+// fraction of a pixel each frame and the frames are blended, so edges,
+// grass and leaves stay smooth instead of flickering; and bloom so lamps,
+// the drone's lights, the sun and its glints glow.
+// Does NOT: screen-space reflections or volumetric clouds.
 
 import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
-import { SMAAPass } from 'three/addons/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { Pass, FullScreenQuad } from 'three/addons/postprocessing/Pass.js';
 import { palette } from './palette.js';
+import { FrameContext, DepthTap, AtmospherePass, TAAPass, LensPass, FinalPass } from './cinematic.js';
 
 export class Post {
-  constructor(renderer, scene, camera, quality, style = 'toon') {
+  constructor(renderer, scene, camera, quality, style = 'realistic') {
     this.renderer = renderer;
+    this.camera = camera;
     const pal = palette(style);
+    this.cinematic = !pal;
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples: quality.msaa });
+    // No hardware multisampling: TAA smooths the edges instead.
+    const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType });
     this.composer = new EffectComposer(renderer, target);
-    if (pal) {
-      // The outline and contact-shadow pass reads the scene's depth. Each
-      // buffer gets its own depth texture: a cloned one would share the GPU
-      // texture, and the pass would read the depth it is writing to.
-      for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) {
-        rt.depthTexture = new THREE.DepthTexture(size.x, size.y);
-        rt.depthTexture.type = THREE.FloatType;
-      }
+    // The passes read the scene's depth. Each buffer gets its own depth
+    // texture: a cloned one would share the GPU texture, and a pass would
+    // read the depth it is writing to.
+    for (const rt of [this.composer.renderTarget1, this.composer.renderTarget2]) {
+      rt.depthTexture = new THREE.DepthTexture(size.x, size.y);
+      rt.depthTexture.type = THREE.FloatType;
     }
+    this.ctx = new FrameContext(camera);
     this.composer.addPass(new RenderPass(scene, camera));
+    this.composer.addPass(new DepthTap(this.ctx));
     if (pal) {
       this.stylize = new StylizePass(camera, pal, quality.ao);
       this.composer.addPass(this.stylize);
+    } else {
+      this.atmosphere = new AtmospherePass(this.ctx);
+      this.composer.addPass(this.atmosphere);
+    }
+    this.taa = new TAAPass(this.ctx);
+    this.composer.addPass(this.taa);
+    if (this.cinematic && (quality.motionBlur || quality.dof)) {
+      this.lens = new LensPass(this.ctx, { motionBlur: quality.motionBlur, dof: quality.dof });
+      this.composer.addPass(this.lens);
     }
     if (quality.bloom) {
-      const b = pal ? pal.bloom : { strength: 0.28, radius: 0.55, threshold: 1.6 };
+      const b = pal ? pal.bloom : { strength: 0.32, radius: 0.6, threshold: 4 }; // the sky stays below the threshold
       this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), b.strength, b.radius, b.threshold);
       this.composer.addPass(this.bloom);
     }
     this.composer.addPass(new OutputPass());
-    this.grade = new ShaderPass(GRADE);
-    const g = pal ? pal.grade : { sat: 1.04, lift: [0, 0, 0], split: 0.4, curve: 0.1, vignette: 0.18 };
-    const u = this.grade.uniforms;
-    u.uSat.value = g.sat;
-    u.uLift.value.set(...g.lift);
-    u.uSplit.value = g.split;
-    u.uCurve.value = g.curve;
-    u.uVignette.value = g.vignette;
-    this.composer.addPass(this.grade);
-    // SMAA on every preset: it also smooths what multisampling misses
-    // (leaf cut-outs, grass blades, shading edges, outlines).
-    this.smaa = new SMAAPass(size.x, size.y);
-    this.composer.addPass(this.smaa);
+    if (this.cinematic) {
+      this.final = new FinalPass(this.ctx);
+      this.composer.addPass(this.final);
+    } else {
+      this.grade = new ShaderPass(GRADE);
+      const g = pal.grade;
+      const u = this.grade.uniforms;
+      u.uSat.value = g.sat;
+      u.uLift.value.set(...g.lift);
+      u.uSplit.value = g.split;
+      u.uCurve.value = g.curve;
+      u.uVignette.value = g.vignette;
+      this.composer.addPass(this.grade);
+    }
     this.pixelRatio = renderer.getPixelRatio();
+    this.lastCamPos = new THREE.Vector3(1e9, 0, 0);
+    this.bufferSize = size.clone();
   }
 
   /** Switch the contact shadows off (used when the frame rate is low). */
@@ -75,15 +88,60 @@ export class Post {
     return true;
   }
 
+  /** Switch motion blur and depth of field off (used when the frame rate is low). */
+  disableLens() {
+    if (!this.lens || !this.lens.enabled) return false;
+    this.lens.enabled = false;
+    return true;
+  }
+
+  /** What the camera looks at: focus distance (m), whether it follows the drone, depth of field 0..1. */
+  setView(focus, follow, dof) {
+    this.ctx.focus = focus;
+    this.ctx.droneFollow = follow;
+    this.ctx.dof = dof;
+  }
+
+  /** Haze: extinction at the base height (1/m), its scale height (m) and the base height (m). */
+  setAtmosphere(density, scaleHeight, base) {
+    if (!this.atmosphere) return;
+    this.atmosphere.density = density;
+    this.atmosphere.scaleHeight = scaleHeight;
+    this.atmosphere.base = base;
+  }
+
   setSize(width, height, pixelRatio) {
     this.pixelRatio = pixelRatio;
     this.composer.setPixelRatio(pixelRatio);
     this.composer.setSize(width, height);
     this.stylize?.setPixelRatio(pixelRatio);
+    this.renderer.getDrawingBufferSize(this.bufferSize);
   }
 
   render(dt) {
+    const cam = this.camera;
+    const ctx = this.ctx;
+    ctx.dt = dt;
+    ctx.time += dt;
+    // A jump (reset, teleport) starts the blending afresh.
+    if (cam.position.distanceTo(this.lastCamPos) > 25) ctx.historyValid = false;
+    this.lastCamPos.copy(cam.position);
+    cam.updateMatrixWorld();
+    ctx.viewProj.multiplyMatrices(cam.projectionMatrix, cam.matrixWorldInverse);
+    // Sub-pixel jitter for TAA, only while drawing this frame.
+    const [jx, jy] = TAAPass.jitter(ctx.frame++);
+    const e = cam.projectionMatrix.elements;
+    const ox = (2 * jx) / this.bufferSize.x;
+    const oy = (2 * jy) / this.bufferSize.y;
+    e[8] += ox;
+    e[9] += oy;
+    cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+    ctx.invViewProj.multiplyMatrices(cam.matrixWorld, cam.projectionMatrixInverse);
     this.composer.render(dt);
+    e[8] -= ox;
+    e[9] -= oy;
+    cam.projectionMatrixInverse.copy(cam.projectionMatrix).invert();
+    ctx.prevViewProj.copy(ctx.viewProj);
   }
 }
 
@@ -169,8 +227,11 @@ class StylizePass extends Pass {
     u.uFocalPx.value = focal;
     // About one screen pixel thick, whatever the render resolution.
     u.uThick.value = Math.max(1, this.pixelRatio);
+    const autoClear = renderer.autoClear;
+    renderer.autoClear = false; // keep the depth buffer for the passes after this one
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.quad.render(renderer);
+    renderer.autoClear = autoClear;
   }
 
   dispose() {
