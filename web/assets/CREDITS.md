@@ -25,3 +25,32 @@ CC0 (public domain); credit is not required but given gladly. Fetched by
 Tree bark and leaf textures in `trees/` come with
 [EZ-Tree](https://github.com/dgreenheck/ez-tree) (MIT, Daniel Greenheck); its
 bark README credits Poly Haven and TextureCan.
+
+<!-- models -->
+## Models
+
+3D models in `models/` come from [Poly Haven](https://polyhaven.com) and are
+CC0 (public domain); credit is not required but given gladly. Fetched by
+`tools/fetch-models.mjs` at 1k and simplified for the browser.
+
+| Model | Authors | Licence |
+|---|---|---|
+| [Rock Moss Set 01](https://polyhaven.com/a/rock_moss_set_01) | Kless Gyzen | CC0 |
+| [Rock Moss Set 02](https://polyhaven.com/a/rock_moss_set_02) | Kless Gyzen | CC0 |
+| [Rock Face 01](https://polyhaven.com/a/rock_face_01) | Dario Barresi | CC0 |
+| [Rock Face 02](https://polyhaven.com/a/rock_face_02) | Dario Barresi, Rico Cilliers | CC0 |
+| [Boulder 01](https://polyhaven.com/a/boulder_01) | Rico Cilliers | CC0 |
+| [Tree Stump 01](https://polyhaven.com/a/tree_stump_01) | Rob Tuytel | CC0 |
+| [Tree Stump 02](https://polyhaven.com/a/tree_stump_02) | Rob Tuytel | CC0 |
+| [Dead Tree Trunk](https://polyhaven.com/a/dead_tree_trunk) | Rob Tuytel | CC0 |
+| [Dry Branches Medium 01](https://polyhaven.com/a/dry_branches_medium_01) | Rico Cilliers | CC0 |
+| [Fern 02](https://polyhaven.com/a/fern_02) | Rob Tuytel, Rico Cilliers | CC0 |
+| [Barrel_01](https://polyhaven.com/a/Barrel_01) | Jorge Camacho | CC0 |
+| [Barrel 03](https://polyhaven.com/a/barrel_03) | Serhii Khromov | CC0 |
+| [Covered Car](https://polyhaven.com/a/covered_car) | MP | CC0 |
+| [Old Tyre](https://polyhaven.com/a/old_tyre) | MP | CC0 |
+| [Utility Box 01](https://polyhaven.com/a/utility_box_01) | James Ray Cock | CC0 |
+| [Portable Generator](https://polyhaven.com/a/portable_generator) | James Ray Cock | CC0 |
+| [Street Lamp 01](https://polyhaven.com/a/street_lamp_01) | Josh Dean | CC0 |
+| [Concrete Road Barrier 02](https://polyhaven.com/a/concrete_road_barrier_02) | Amal Kumar | CC0 |
+<!-- /models -->

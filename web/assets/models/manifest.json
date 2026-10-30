@@ -1,0 +1,412 @@
+{
+  "resolution": "1k",
+  "source": "Poly Haven (CC0)",
+  "models": {
+    "rock_moss_set_01": {
+      "id": "rock_moss_set_01",
+      "name": "Rock Moss Set 01",
+      "authors": [
+        "Kless Gyzen"
+      ],
+      "categories": [
+        "rocks",
+        "nature",
+        "collection: pine_forest"
+      ],
+      "polycount": 63127,
+      "dimensionsMm": [
+        8004.603862762451,
+        6948.764801025391,
+        1768.319845199585
+      ],
+      "url": "https://polyhaven.com/a/rock_moss_set_01",
+      "file": "rock_moss_set_01.glb",
+      "bytes": 433752,
+      "keptVertices": 0.12
+    },
+    "rock_moss_set_02": {
+      "id": "rock_moss_set_02",
+      "name": "Rock Moss Set 02",
+      "authors": [
+        "Kless Gyzen"
+      ],
+      "categories": [
+        "rocks",
+        "nature",
+        "collection: pine_forest"
+      ],
+      "polycount": 57647,
+      "dimensionsMm": [
+        8278.153419494629,
+        3410.416603088379,
+        1368.368238210678
+      ],
+      "url": "https://polyhaven.com/a/rock_moss_set_02",
+      "file": "rock_moss_set_02.glb",
+      "bytes": 511176,
+      "keptVertices": 0.12
+    },
+    "rock_face_01": {
+      "id": "rock_face_01",
+      "name": "Rock Face 01",
+      "authors": [
+        "Dario Barresi"
+      ],
+      "categories": [
+        "rocks",
+        "nature",
+        "collection: verdant_trail"
+      ],
+      "polycount": 20174,
+      "dimensionsMm": [
+        7108.232021331787,
+        5624.304533004761,
+        4980.4371148347855
+      ],
+      "url": "https://polyhaven.com/a/rock_face_01",
+      "file": "rock_face_01.glb",
+      "bytes": 634992,
+      "keptVertices": 0.35
+    },
+    "rock_face_02": {
+      "id": "rock_face_02",
+      "name": "Rock Face 02",
+      "authors": [
+        "Dario Barresi",
+        "Rico Cilliers"
+      ],
+      "categories": [
+        "rocks",
+        "nature",
+        "collection: verdant_trail"
+      ],
+      "polycount": 29566,
+      "dimensionsMm": [
+        4870.411515235901,
+        3472.859501838684,
+        4734.235167503357
+      ],
+      "url": "https://polyhaven.com/a/rock_face_02",
+      "file": "rock_face_02.glb",
+      "bytes": 750612,
+      "keptVertices": 0.3
+    },
+    "boulder_01": {
+      "id": "boulder_01",
+      "name": "Boulder 01",
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "categories": [
+        "rocks",
+        "nature",
+        "collection: verdant_trail"
+      ],
+      "polycount": 123976,
+      "dimensionsMm": [
+        1272.6830840110779,
+        1830.7338953018188,
+        1003.8918256759644
+      ],
+      "url": "https://polyhaven.com/a/boulder_01",
+      "file": "boulder_01.glb",
+      "bytes": 2089220,
+      "keptVertices": 0.06
+    },
+    "tree_stump_01": {
+      "id": "tree_stump_01",
+      "name": "Tree Stump 01",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "categories": [
+        "nature",
+        "plants",
+        "ground cover",
+        "trees",
+        "collection: pine_forest"
+      ],
+      "polycount": 41046,
+      "dimensionsMm": [
+        1425.5504608154297,
+        1590.3143286705017,
+        572.6675391197205
+      ],
+      "url": "https://polyhaven.com/a/tree_stump_01",
+      "file": "tree_stump_01.glb",
+      "bytes": 777436,
+      "keptVertices": 0.15
+    },
+    "tree_stump_02": {
+      "id": "tree_stump_02",
+      "name": "Tree Stump 02",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "categories": [
+        "nature",
+        "plants",
+        "ground cover",
+        "trees",
+        "collection: pine_forest"
+      ],
+      "polycount": 62345,
+      "dimensionsMm": [
+        1521.6976404190063,
+        1392.5331234931946,
+        522.0921486616135
+      ],
+      "url": "https://polyhaven.com/a/tree_stump_02",
+      "file": "tree_stump_02.glb",
+      "bytes": 834404,
+      "keptVertices": 0.12
+    },
+    "dead_tree_trunk": {
+      "id": "dead_tree_trunk",
+      "name": "Dead Tree Trunk",
+      "authors": [
+        "Rob Tuytel"
+      ],
+      "categories": [
+        "nature",
+        "plants",
+        "ground cover",
+        "collection: pine_forest",
+        "collection: verdant_trail"
+      ],
+      "polycount": 101802,
+      "dimensionsMm": [
+        3051.015019416809,
+        277.52751111984253,
+        290.43155536055565
+      ],
+      "url": "https://polyhaven.com/a/dead_tree_trunk",
+      "file": "dead_tree_trunk.glb",
+      "bytes": 598432,
+      "keptVertices": 0.08
+    },
+    "dry_branches_medium_01": {
+      "id": "dry_branches_medium_01",
+      "name": "Dry Branches Medium 01",
+      "authors": [
+        "Rico Cilliers"
+      ],
+      "categories": [
+        "props",
+        "nature",
+        "plants",
+        "ground cover",
+        "collection: pine_forest",
+        "collection: verdant_trail"
+      ],
+      "polycount": 16803,
+      "dimensionsMm": [
+        1059.486210346222,
+        1299.152910709381,
+        340.9853130578995
+      ],
+      "url": "https://polyhaven.com/a/dry_branches_medium_01",
+      "file": "dry_branches_medium_01.glb",
+      "bytes": 737424,
+      "keptVertices": 0.4
+    },
+    "fern_02": {
+      "id": "fern_02",
+      "name": "Fern 02",
+      "authors": [
+        "Rob Tuytel",
+        "Rico Cilliers"
+      ],
+      "categories": [
+        "plants",
+        "nature",
+        "collection: smugglers_cove",
+        "collection: pine_forest"
+      ],
+      "polycount": 6232,
+      "dimensionsMm": [
+        1972.5302457809448,
+        1724.0281701087952,
+        427.6947118341923
+      ],
+      "url": "https://polyhaven.com/a/fern_02",
+      "file": "fern_02.glb",
+      "bytes": 252912,
+      "keptVertices": 1
+    },
+    "Barrel_01": {
+      "id": "Barrel_01",
+      "name": "Barrel_01",
+      "authors": [
+        "Jorge Camacho"
+      ],
+      "categories": [
+        "industrial",
+        "containers"
+      ],
+      "polycount": 2682,
+      "dimensionsMm": [
+        563.0351305007935,
+        563.0352199077606,
+        880.0000050105155
+      ],
+      "url": "https://polyhaven.com/a/Barrel_01",
+      "file": "Barrel_01.glb",
+      "bytes": 385692,
+      "keptVertices": 1
+    },
+    "barrel_03": {
+      "id": "barrel_03",
+      "name": "Barrel 03",
+      "authors": [
+        "Serhii Khromov"
+      ],
+      "categories": [
+        "industrial",
+        "containers"
+      ],
+      "polycount": 1473,
+      "dimensionsMm": [
+        633.943498134613,
+        638.5995149612427,
+        930.4736243899824
+      ],
+      "url": "https://polyhaven.com/a/barrel_03",
+      "file": "barrel_03.glb",
+      "bytes": 289504,
+      "keptVertices": 1
+    },
+    "covered_car": {
+      "id": "covered_car",
+      "name": "Covered Car",
+      "authors": [
+        "MP"
+      ],
+      "categories": [
+        "props",
+        "industrial",
+        "collection: hidden_alley"
+      ],
+      "polycount": 12592,
+      "dimensionsMm": [
+        1788.962960243225,
+        4380.25426864624,
+        1411.1130833625793
+      ],
+      "url": "https://polyhaven.com/a/covered_car",
+      "file": "covered_car.glb",
+      "bytes": 509492,
+      "keptVertices": 1
+    },
+    "old_tyre": {
+      "id": "old_tyre",
+      "name": "Old Tyre",
+      "authors": [
+        "MP"
+      ],
+      "categories": [
+        "industrial",
+        "props",
+        "collection: hidden_alley"
+      ],
+      "polycount": 2880,
+      "dimensionsMm": [
+        600.0000238418579,
+        164.99999910593033,
+        600.0000238418579
+      ],
+      "url": "https://polyhaven.com/a/old_tyre",
+      "file": "old_tyre.glb",
+      "bytes": 399700,
+      "keptVertices": 1
+    },
+    "utility_box_01": {
+      "id": "utility_box_01",
+      "name": "Utility Box 01",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "categories": [
+        "industrial",
+        "structures",
+        "collection: hidden_alley"
+      ],
+      "polycount": 4404,
+      "dimensionsMm": [
+        520.0002193450928,
+        431.999996304512,
+        1120.3334331512451
+      ],
+      "url": "https://polyhaven.com/a/utility_box_01",
+      "file": "utility_box_01.glb",
+      "bytes": 283516,
+      "keptVertices": 1
+    },
+    "portable_generator": {
+      "id": "portable_generator",
+      "name": "Portable Generator",
+      "authors": [
+        "James Ray Cock"
+      ],
+      "categories": [
+        "industrial",
+        "appliances",
+        "collection: project_lighthouse"
+      ],
+      "polycount": 26419,
+      "dimensionsMm": [
+        818.3408081531525,
+        564.0000104904175,
+        576.9232391612604
+      ],
+      "url": "https://polyhaven.com/a/portable_generator",
+      "file": "portable_generator.glb",
+      "bytes": 777672,
+      "keptVertices": 0.5
+    },
+    "street_lamp_01": {
+      "id": "street_lamp_01",
+      "name": "Street Lamp 01",
+      "authors": [
+        "Josh Dean"
+      ],
+      "categories": [
+        "lighting",
+        "industrial",
+        "collection: hidden_alley"
+      ],
+      "polycount": 30610,
+      "dimensionsMm": [
+        704.3362259864807,
+        386.49316132068634,
+        3870.5554008483887
+      ],
+      "url": "https://polyhaven.com/a/street_lamp_01",
+      "file": "street_lamp_01.glb",
+      "bytes": 435768,
+      "keptVertices": 0.5
+    },
+    "concrete_road_barrier_02": {
+      "id": "concrete_road_barrier_02",
+      "name": "Concrete Road Barrier 02",
+      "authors": [
+        "Amal Kumar"
+      ],
+      "categories": [
+        "industrial",
+        "structures",
+        "collection: hidden_alley"
+      ],
+      "polycount": 42578,
+      "dimensionsMm": [
+        1566.9698119163513,
+        442.20101833343506,
+        1111.9812715332955
+      ],
+      "url": "https://polyhaven.com/a/concrete_road_barrier_02",
+      "file": "concrete_road_barrier_02.glb",
+      "bytes": 520484,
+      "keptVertices": 0.2
+    }
+  }
+}
