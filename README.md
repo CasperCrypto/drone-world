@@ -215,13 +215,22 @@ is a game estimate.
 
 ## Roadmap
 
+The aim: a professional training and test environment that is also fun to
+fly. Cadets learn to operate drones, civil operators rehearse missions
+(inspection, mapping, search and rescue, agriculture, observation), and
+builders try a design, or their own 3D model with its real specifications,
+before they build it.
+
 | # | Milestone | State |
 |---|---|---|
 | M1 | Playable browser sandbox: landscape, two drones, three modes, controllers, gates | **Done** |
 | M1.5 | Realistic world: scanned materials, generated forest, grass, sky, day and night, weather, temperature, wind field | **Done (2026-10-30)** |
-| M2 | Energy and air: battery model (capacity, voltage sag, cold), flight time and low-battery behaviour, air density from temperature and height, in `core/cpp` and `flight.js` together | Next |
-| M3 | Builder: frame, motors, propellers, battery → thrust, weight, hover throttle, flight time (from real test data, labelled estimates until then) | Planned |
-| M4 | Real places: 3D Tiles (Cesium ion or Google Photorealistic, each with its own key and terms) or open elevation data | Planned |
+| M1.6 | Look: art styles, temporal anti-aliasing, haze and lens, scanned 3D models, no repeating textures | **Done (2026-10-30)** |
+| M2 | Energy and air: battery model (capacity, voltage sag, cold), flight time and low-battery behaviour (warnings, return home, forced landing), air density from temperature and height, in `core/cpp` and `flight.js` together | Next |
+| M2.5 | Drone catalogue: camera drone, FPV 5-inch, fast racing quad, heavy agricultural hexacopter (tank mass that falls as it sprays a field), long-range fixed-wing for survey and observation, RC jet. Fixed-wing needs its own flight model in `core/cpp` and `flight.js` | Planned |
+| M3 | Builder and your own drone: upload a 3D model and enter its specifications (mass, motors, propellers, battery), or build from parts; the sandbox reports hover throttle, flight time, top speed and the wind it can handle (labelled estimates until checked against test flights) | Planned |
+| M3.5 | Training: missions with checklists and scoring for cadets (pre-flight check, hover box, figure eight, landing in wind, return home on low battery, visual line of sight), civil scenarios (inspection, mapping, search and rescue, crop spraying, observation), a flight logbook | Planned |
+| M4 | Real places: pick a square of the real world on a map and fly over its terrain, buildings and trees, from 3D Tiles (Google Photorealistic or Cesium ion, each with its own key and terms) or open data (for Poland: GUGiK elevation, aerial photos and building models) | Planned |
 | M5 | Real autopilot: fly on ArduPilot or PX4 in software-in-the-loop | Planned |
 | M6 | Accounts, larger areas (the 10 × 10 km tier), multiplayer | Planned, after users ask for it |
 | U1 | Unreal Engine 5 client with the same `core/cpp` physics | Later |
@@ -231,6 +240,8 @@ is a game estimate.
 - Keep `core/cpp/DroneFlightModel.h` and `web/src/flight.js` in step. If you
   change one, change the other, run `make_fixture.sh` and both test suites.
 - No weapons, payload release, strike or counter-drone evasion content.
+  Observation and survey flights are fine; crop spraying is modelled as a
+  tank whose mass falls and a field coverage map, nothing is dropped.
 - Do not model real critical infrastructure (power plants, military sites)
   in detail in anything public.
 - Every number a user reads is either measured (with its source) or labelled
